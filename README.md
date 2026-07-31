@@ -1,8 +1,21 @@
 # FXA Trade — Professional Trading Broker Platform
 
-**Full-stack monorepo** — React 18 + TypeScript frontend, Express + Prisma + PostgreSQL backend.
+**Full-stack monorepo** — React 18 + TypeScript frontend, Express + Prisma backend with SQLite (local) / PostgreSQL (production).
 
----
+## Quick Start (No Docker Required)
+
+```bash
+cd broker
+npm install && cd server && npm install && cd ../client && npm install && cd ..
+cp .env.example server/.env
+cd server && npx prisma generate && npx prisma db push && npx tsx prisma/seed.ts && cd ..
+npm run dev
+# App: http://localhost:5173
+# API: http://localhost:4000
+```
+
+> **Local dev uses SQLite** — no Docker or PostgreSQL needed.  
+> For production PostgreSQL, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Architecture
 
