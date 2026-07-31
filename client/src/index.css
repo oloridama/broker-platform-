@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base layer ─────────────────────────────────────── */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply min-h-screen;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* ── Scrollbar ──────────────────────────────────── */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-broker-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-broker-500 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-broker-400;
+  }
+
+  /* ── Focus ring ─────────────────────────────────── */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+    outline-style: solid;
+  }
+}
+
+/* ── Component layer ────────────────────────────────── */
+@layer components {
+  /* Glass card */
+  .glass {
+    @apply bg-surface-card backdrop-blur-md border border-broker-700/50 rounded-xl relative z-10;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-accent to-accent-light bg-clip-text text-transparent;
+  }
+
+  /* Button base */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           font-medium rounded-lg transition-all duration-200
+           focus-visible:outline-2 focus-visible:outline-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed
+           min-h-[44px] min-w-[44px];
+  }
+  .btn-primary {
+    @apply btn bg-accent text-white hover:bg-accent-dark
+           shadow-lg shadow-accent-glow;
+  }
+  .btn-secondary {
+    @apply btn bg-broker-700 text-broker-100 hover:bg-broker-600
+           border border-broker-600;
+  }
+  .btn-danger {
+    @apply btn bg-danger/10 text-danger border border-danger/30
+           hover:bg-danger/20;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-broker-300 hover:text-broker-100
+           hover:bg-broker-800;
+  }
+
+  /* Input */
+  .input {
+    @apply w-full bg-surface-input border border-broker-600 rounded-lg
+           px-4 py-3 text-broker-100 placeholder:text-broker-400
+           transition-all duration-200 min-h-[44px]
+           focus:border-accent focus:ring-1 focus:ring-accent/30
+           focus:outline-none;
+  }
+  .input-error {
+    @apply border-danger focus:border-danger focus:ring-danger/30;
+  }
+
+  /* Label */
+  .label {
+    @apply block text-fluid-sm font-medium text-broker-300 mb-1.5;
+  }
+}
+
+/* ── Utility layer ──────────────────────────────────── */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+}

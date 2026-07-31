@@ -1,0 +1,12 @@
+{
+  "name": "FXA Trade",
+  "short_name": "FXATrade",
+  "description": "Professional Trading Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0f1e",
+  "theme_color": "#10b981",
+  "icons": [
+    { "src": "/vite.svg", "sizes": "192x192", "type": "image/svg+xml" }
+  ]
+}

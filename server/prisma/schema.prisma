@@ -1,0 +1,244 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          String   @default("USER")
+  isActive      Boolean  @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  refreshTokens      RefreshToken[]
+  accounts           TradingAccount[]
+  orders             Order[]
+  wallets            Wallet[]
+  bots               Bot[]
+  withdrawalRequests WithdrawalRequest[]
+  kyc                Kyc?
+  @@index([email])
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([token])
+}
+
+model Kyc {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status          String   @default("PENDING")
+  documentType    String
+  documentNumber  String
+  addressLine1    String?
+  city            String?
+  postalCode      String?
+  country         String?
+  rejectionReason String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model TradingAccount {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountType String   @default("STANDARD")
+  leverage    Int      @default(100)
+  currency    String   @default("USD")
+  balance     Float    @default(0)
+  equity      Float    @default(0)
+  margin      Float    @default(0)
+  freeMargin  Float    @default(0)
+  marginLevel Float    @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  orders      Order[]
+  positions   Position[]
+  @@index([userId])
+}
+
+model Wallet {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency     String        @default("USD")
+  balance      Float         @default(0)
+  isDefault    Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+  @@index([userId])
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  walletId    String
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  type        String
+  amount      Float
+  currency    String   @default("USD")
+  status      String   @default("PENDING")
+  reference   String?
+  description String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([walletId])
+}
+
+model Instrument {
+  id         String   @id @default(uuid())
+  symbol     String   @unique
+  name       String
+  type       String
+  category   String?
+  pipSize    Float    @default(0.0001)
+  minLot     Float    @default(0.01)
+  maxLot     Float    @default(100)
+  lotStep    Float    @default(0.01)
+  spread     Float    @default(1.0)
+  commission Float    @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  quotes     Quote[]
+  orders     Order[]
+  positions  Position[]
+  @@index([symbol])
+  @@index([type])
+}
+
+model Quote {
+  id           String     @id @default(uuid())
+  instrumentId String
+  instrument   Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  bid          Float
+  ask          Float
+  high         Float
+  low          Float
+  open         Float
+  change       Float
+  timestamp    DateTime   @default(now())
+  @@index([instrumentId])
+  @@index([timestamp])
+}
+
+model Order {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId    String
+  account      TradingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  instrumentId String
+  instrument   Instrument    @relation(fields: [instrumentId], references: [id])
+  type         String
+  side         String
+  lotSize      Float
+  price        Float?
+  stopLoss     Float?
+  takeProfit   Float?
+  status       String        @default("PENDING")
+  filledPrice  Float?
+  filledAt     DateTime?
+  commission   Float         @default(0)
+  swap         Float         @default(0)
+  profit       Float         @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  @@index([userId])
+  @@index([accountId])
+  @@index([status])
+}
+
+model Position {
+  id           String        @id @default(uuid())
+  accountId    String
+  account      TradingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  instrumentId String
+  instrument   Instrument    @relation(fields: [instrumentId], references: [id])
+  side         String
+  lotSize      Float
+  openPrice    Float
+  currentPrice Float         @default(0)
+  stopLoss     Float?
+  takeProfit   Float?
+  commission   Float         @default(0)
+  swap         Float         @default(0)
+  profit       Float         @default(0)
+  isOpen       Boolean       @default(true)
+  openedAt     DateTime      @default(now())
+  closedAt     DateTime?
+  @@index([accountId])
+  @@index([isOpen])
+}
+
+model Bot {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  type          String   @default("CRYPTO")
+  strategy      String
+  status        String   @default("INACTIVE")
+  config        String   @default("{}")
+  dailyYieldMin Float    @default(0)
+  dailyYieldMax Float    @default(0)
+  riskLevel     String   @default("Medium")
+  targetPairs   String   @default("")
+  exchanges     String   @default("")
+  totalProfit   Float    @default(0)
+  tradesCount   Int      @default(0)
+  uptimeSeconds Int      @default(0)
+  lastRunAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([userId])
+  @@index([status])
+}
+
+model WithdrawalRequest {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletAddress String
+  amount        Float
+  currency      String   @default("USD")
+  status        String   @default("PENDING")
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([userId])
+  @@index([status])
+}
+
+model AdminAction {
+  id          String   @id @default(uuid())
+  adminId     String
+  actionType  String
+  targetId    String?
+  description String
+  metadata    String   @default("{}")
+  createdAt   DateTime @default(now())
+}
