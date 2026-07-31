@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Shield, Star, Clock } from "lucide-react";
+import { useLivePrices } from "@/hooks/useLivePrices";
 
 const ROTATING_WORDS = ["Stocks", "Forex", "Crypto", "Bonds", "ETFs", "Commodities"];
 
 export function HeroSection() {
+  const prices = useLivePrices(10000);
+  const btc = prices.find((p) => p.symbol === "BTC/USD");
+  const eth = prices.find((p) => p.symbol === "ETH/USD");
+  const eur = prices.find((p) => p.symbol === "EUR/USD");
   const [wordIdx, setWordIdx] = useState(0);
   const [mounted, setMounted] = useState(false);
 
@@ -90,19 +95,29 @@ export function HeroSection() {
               <div className="font-mono text-xs space-y-2 text-broker-300">
                 <div className="flex justify-between">
                   <span className="text-broker-500">BTC/USDT</span>
-                  <span className="text-white">65,174.30</span>
+                  <span className="text-white">
+                    ${btc ? btc.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-accent">▲ 24h Change</span>
-                  <span className="text-profit">+2.25%</span>
+                  <span className={btc && btc.changePercent >= 0 ? "text-accent" : "text-broker-500"}>
+                    {btc && btc.changePercent >= 0 ? "▲" : "▼"} 24h Change
+                  </span>
+                  <span className={btc && btc.changePercent >= 0 ? "text-profit" : "text-loss"}>
+                    {btc ? `${btc.changePercent >= 0 ? "+" : ""}${btc.changePercent.toFixed(2)}%` : "—"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-broker-500">Volume (24h)</span>
-                  <span className="text-white">$7.5B</span>
+                  <span className="text-broker-500">ETH/USDT</span>
+                  <span className="text-white">
+                    ${eth ? eth.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-broker-500">Session</span>
-                  <span className="text-accent">CONNECTED</span>
+                  <span className="text-broker-500">EUR/USD</span>
+                  <span className="text-white">
+                    {eur ? eur.price.toFixed(5) : "—"}
+                  </span>
                 </div>
               </div>
               {/* Mini bars */}
