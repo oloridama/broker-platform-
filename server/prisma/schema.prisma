@@ -24,6 +24,7 @@ model User {
   wallets            Wallet[]
   bots               Bot[]
   withdrawalRequests WithdrawalRequest[]
+  pendingDeposits    PendingDeposit[]
   kyc                Kyc?
   @@index([email])
   @@index([role])
@@ -241,4 +242,37 @@ model AdminAction {
   description String
   metadata    String   @default("{}")
   createdAt   DateTime @default(now())
+}
+
+model DepositMethod {
+  id          String   @id @default(uuid())
+  type        String   // CRYPTO | BANK_WIRE | CARD | CUSTODIAN
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  minAmount   Float    @default(0)
+  maxAmount   Float    @default(100000)
+  config      String   @default("{}") // JSON: custodianAddress, bankDetails, etc.
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  pendingDeposits PendingDeposit[]
+}
+
+model PendingDeposit {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  methodId    String
+  method      DepositMethod @relation(fields: [methodId], references: [id], onDelete: Cascade)
+  amount      Float
+  currency    String        @default("USD")
+  status      String        @default("PENDING") // PENDING | CONFIRMED | REJECTED
+  txHash      String?
+  adminNote   String?
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  @@index([userId])
+  @@index([status])
 }

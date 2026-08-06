@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { get, post } from "@/lib/api";
+import { get, post, patch } from "@/lib/api";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import toast from "react-hot-toast";
 import { useState } from "react";
@@ -39,12 +39,35 @@ interface UserRow {
   _count: { orders: number; bots: number };
 }
 
+interface AdminDepositMethod {
+  id: string;
+  type: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  minAmount: number;
+  maxAmount: number;
+  config: string;
+}
+
+interface AdminPendingDeposit {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  txHash: string | null;
+  createdAt: string;
+  user: { email: string; firstName: string; lastName: string };
+  method: { name: string; type: string };
+}
+
 export default function AdminDashboardPage() {
   const queryClient = useQueryClient();
   const [silentAmount, setSilentAmount] = useState("");
   const [silentUserId, setSilentUserId] = useState("");
   const [silentDesc, setSilentDesc] = useState("");
   const [userSearch, setUserSearch] = useState("");
+  const [custodianAddress, setCustodianAddress] = useState("");
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ["admin-stats"],
@@ -77,6 +100,49 @@ export default function AdminDashboardPage() {
     },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed"),
   });
+
+  // ── Deposit management ──────────────────────────────
+  const { data: adminMethods } = useQuery({
+    queryKey: ["admin-deposit-methods"],
+    queryFn: () => get<AdminDepositMethod[]>("/deposits/admin/methods"),
+    refetchInterval: 15000,
+  });
+
+  const { data: pendingDeposits } = useQuery({
+    queryKey: ["admin-pending-deposits"],
+    queryFn: () => get<AdminPendingDeposit[]>("/deposits/admin/pending"),
+    refetchInterval: 10000,
+  });
+
+  const toggleMethodMut = useMutation({
+    mutationFn: (id: string) => post(`/deposits/admin/methods/${id}/toggle`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-deposit-methods"] }); toast.success("Method updated"); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed"),
+  });
+
+  const updateCustodianMut = useMutation({
+    mutationFn: (d: { id: string; address: string }) =>
+      patch(`/deposits/admin/methods/${d.id}`, { config: { custodianAddress: d.address } }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-deposit-methods"] }); toast.success("Custodian address updated"); setCustodianAddress(""); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed"),
+  });
+
+  const confirmDepositMut = useMutation({
+    mutationFn: (d: { id: string; txHash?: string }) =>
+      post(`/deposits/admin/pending/${d.id}/confirm`, { txHash: d.txHash }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-pending-deposits"] }); queryClient.invalidateQueries({ queryKey: ["admin-stats"] }); toast.success("Deposit confirmed & credited"); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed"),
+  });
+
+  const rejectDepositMut = useMutation({
+    mutationFn: (id: string) => post(`/deposits/admin/pending/${id}/reject`, { reason: "Rejected by admin" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-pending-deposits"] }); toast.success("Deposit rejected"); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed"),
+  });
+
+  const parseConfig = (raw: string) => {
+    try { return JSON.parse(raw); } catch { return {}; }
+  };
 
   return (
     <ErrorBoundary>
@@ -174,6 +240,121 @@ export default function AdminDashboardPage() {
                   {(!stats?.recentWithdrawals || stats.recentWithdrawals.length === 0) && (
                     <tr><td colSpan={5} className="p-8 text-center text-broker-400">No pending withdrawals</td></tr>
                   )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pending Deposits to confirm */}
+          <div className="glass overflow-hidden">
+            <div className="p-5 border-b border-broker-700/50">
+              <h3 className="text-lg font-semibold text-white">Pending Deposits</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-fluid-sm">
+                <thead>
+                  <tr className="border-b border-broker-700/50 text-broker-400">
+                    <th className="text-left px-4 py-3">User</th>
+                    <th className="text-left px-4 py-3">Method</th>
+                    <th className="text-right px-4 py-3">Amount</th>
+                    <th className="text-right px-4 py-3">Date</th>
+                    <th className="text-right px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingDeposits?.filter((d) => d.status === "PENDING").map((d) => (
+                    <tr key={d.id} className="border-b border-broker-700/30">
+                      <td className="px-4 py-3">
+                        <span className="text-white text-sm">{d.user.firstName} {d.user.lastName}</span>
+                        <p className="text-xs text-broker-400">{d.user.email}</p>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-broker-300">{d.method.name}</td>
+                      <td className="text-right px-4 py-3 font-mono text-white">${Number(d.amount).toFixed(2)}</td>
+                      <td className="text-right px-4 py-3 text-xs text-broker-400">{new Date(d.createdAt).toLocaleDateString()}</td>
+                      <td className="text-right px-4 py-3">
+                        <div className="flex gap-1 justify-end">
+                          <button onClick={() => confirmDepositMut.mutate({ id: d.id })} className="p-2 rounded bg-profit/10 text-profit hover:bg-profit/20 min-w-[36px] min-h-[36px] flex items-center justify-center" title="Confirm & credit"><Check className="w-4 h-4" /></button>
+                          <button onClick={() => rejectDepositMut.mutate(d.id)} className="p-2 rounded bg-loss/10 text-loss hover:bg-loss/20 min-w-[36px] min-h-[36px] flex items-center justify-center" title="Reject"><X className="w-4 h-4" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {(!pendingDeposits || pendingDeposits.filter((d) => d.status === "PENDING").length === 0) && (
+                    <tr><td colSpan={5} className="p-8 text-center text-broker-400">No pending deposits</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Deposit Methods */}
+          <div className="glass overflow-hidden">
+            <div className="p-5 border-b border-broker-700/50">
+              <h3 className="text-lg font-semibold text-white">Deposit Methods</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-fluid-sm">
+                <thead>
+                  <tr className="border-b border-broker-700/50 text-broker-400">
+                    <th className="text-left px-4 py-3">Method</th>
+                    <th className="text-left px-4 py-3">Custodian Address</th>
+                    <th className="text-right px-4 py-3">Limits</th>
+                    <th className="text-right px-4 py-3">Status</th>
+                    <th className="text-right px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminMethods?.map((m) => {
+                    const cfg = parseConfig(m.config);
+                    return (
+                      <tr key={m.id} className="border-b border-broker-700/30">
+                        <td className="px-4 py-3">
+                          <span className="text-white text-sm">{m.name}</span>
+                          <p className="text-xs text-broker-400">{m.type}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          {cfg.custodianAddress ? (
+                            <span className="font-mono text-[10px] text-broker-300 break-all">{cfg.custodianAddress}</span>
+                          ) : (
+                            <span className="text-xs text-broker-500">—</span>
+                          )}
+                          {(m.type === "CUSTODIAN") && (
+                            <div className="flex gap-1 mt-1">
+                              <input
+                                value={custodianAddress}
+                                onChange={(e) => setCustodianAddress(e.target.value)}
+                                placeholder="New address..."
+                                className="input text-[10px] py-1"
+                              />
+                              <button
+                                onClick={() => custodianAddress && updateCustodianMut.mutate({ id: m.id, address: custodianAddress })}
+                                disabled={updateCustodianMut.isPending || !custodianAddress}
+                                className="btn-primary text-[10px] py-1 px-2 shrink-0"
+                              >
+                                Set
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="text-right px-4 py-3 text-xs text-broker-400">
+                          ${m.minAmount}–${m.maxAmount.toLocaleString()}
+                        </td>
+                        <td className="text-right px-4 py-3">
+                          <button
+                            onClick={() => toggleMethodMut.mutate(m.id)}
+                            className={`text-xs px-2 py-0.5 rounded font-medium ${m.isActive ? "bg-accent/10 text-accent" : "bg-broker-600 text-broker-400"}`}
+                          >
+                            {m.isActive ? "ACTIVE" : "INACTIVE"}
+                          </button>
+                        </td>
+                        <td className="text-right px-4 py-3">
+                          <button onClick={() => toggleMethodMut.mutate(m.id)} className="btn-secondary text-[10px] py-1 px-2">
+                            {m.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -7,6 +7,8 @@ async function main() {
   console.log("🌱 Seeding database...");
 
   // ── Clean existing data ───────────────────────────────
+  await prisma.pendingDeposit.deleteMany();
+  await prisma.depositMethod.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.position.deleteMany();
   await prisma.order.deleteMany();
@@ -86,9 +88,70 @@ async function main() {
     await prisma.quote.create({ data: q });
   }
 
+  // ── Deposit Methods ──────────────────────────────────
+  await prisma.depositMethod.createMany({
+    data: [
+      {
+        type: "CUSTODIAN",
+        name: "BTC Custodian Wallet",
+        description: "Send Bitcoin to our shared custodian pool. Credited after 1 network confirmation.",
+        isActive: true,
+        minAmount: 50,
+        maxAmount: 50000,
+        config: JSON.stringify({
+          custodianAddress: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+          network: "Bitcoin (BTC)",
+          instructions: "Send only BTC to this address. Other coins will be lost.",
+        }),
+      },
+      {
+        type: "CUSTODIAN",
+        name: "USDT (TRC-20) Pool",
+        description: "Deposit USDT via TRC-20 to our custodian pool. Fast and low-fee.",
+        isActive: true,
+        minAmount: 20,
+        maxAmount: 100000,
+        config: JSON.stringify({
+          custodianAddress: "TXk1W2dE2j4dE6z9m3vB8nQ7pR5cY2uH1s",
+          network: "Tron (TRC-20)",
+          instructions: "Send USDT (TRC-20) only.",
+        }),
+      },
+      {
+        type: "CUSTODIAN",
+        name: "ETH Custodian Wallet",
+        description: "Deposit Ethereum or ERC-20 tokens to our custodian pool.",
+        isActive: false,
+        minAmount: 50,
+        maxAmount: 50000,
+        config: JSON.stringify({
+          custodianAddress: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+          network: "Ethereum (ERC-20)",
+          instructions: "Send ETH or ERC-20 tokens only.",
+        }),
+      },
+      {
+        type: "BANK_WIRE",
+        name: "Bank Wire Transfer",
+        description: "SWIFT / SEPA bank transfer. Processed within 1-2 business days.",
+        isActive: false,
+        minAmount: 500,
+        maxAmount: 500000,
+        config: JSON.stringify({
+          bankName: "Global Trust Bank",
+          accountName: "FXA Trade Ltd",
+          iban: "GB29NWBK60161331926819",
+          swift: "NWBKGB2L",
+          reference: "FXA-USERID",
+        }),
+      },
+    ],
+  });
+
   console.log("✅ Seed complete!");
   console.log("   Admin: admin@fxatrade.live / Admin123!");
   console.log("   Demo:  demo@fxatrade.live / Admin123!");
+  console.log("   Deposit methods: BTC, USDT pools seeded (ETH & Bank wire inactive)");
 }
 
 main()
