@@ -5,6 +5,8 @@ import compression from "compression";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
+import path from "path";
+import fs from "fs";
 
 import { config } from "./config";
 import { errorHandler } from "./middleware/errorHandler";
@@ -83,6 +85,23 @@ app.use("/api/bots", botRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/deposits", depositRoutes);
 app.use("/api/markets", marketRoutes);
+
+// ── Production: serve built client + SPA fallback ─────
+// In production, Express serves the compiled React app (client/dist) so a
+// single process can host both the API and the frontend. In development the
+// Vite dev server handles the client, so this block is skipped.
+if (config.env === "production") {
+  const clientDist = path.resolve(__dirname, "../../client/dist");
+  if (fs.existsSync(clientDist)) {
+    app.use(express.static(clientDist));
+    // SPA fallback — all non-API GETs return index.html (client-side routing)
+    app.get(/^\/(?!api|ws).*/, (_req, res) => {
+      res.sendFile(path.join(clientDist, "index.html"));
+    });
+  } else {
+    console.warn(`⚠️  client/dist not found at ${clientDist} — frontend will not be served. Run "npm run build:client".`);
+  }
+}
 
 // ── 404 handler ─────────────────────────────────────────
 app.use((_req, res) => {
