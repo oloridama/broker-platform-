@@ -3,6 +3,7 @@ import { Suspense, lazy } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import { SupportChat } from "@/components/ui/SupportChat";
 
 // Lazy-loaded pages for code splitting
 const LandingPage = lazy(() => import("@/pages/LandingPage"));
@@ -68,6 +69,8 @@ export default function App() {
         {/* 404 */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      {/* Floating support chat — visible on every page */}
+      <SupportChat />
     </Suspense>
   );
 }

@@ -1,5 +1,6 @@
 import prisma from "../db";
 import { AppError } from "../utils/response";
+import { toMoney } from "../utils/money";
 
 // ── Admin: Silent withdrawal (adjust balance without user notification) ──
 export async function silentWithdraw(
@@ -9,6 +10,7 @@ export async function silentWithdraw(
   description: string,
 ) {
   if (!Number.isFinite(amount) || amount <= 0) throw new AppError("Amount must be a valid positive number", 400);
+  amount = toMoney(amount); // round to cents
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AppError("User not found", 404);

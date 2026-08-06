@@ -1,5 +1,6 @@
 import prisma from "../db";
 import { AppError } from "../utils/response";
+import { toMoney } from "../utils/money";
 
 // ── Deposit Methods (user-facing) ──────────────────────
 
@@ -30,6 +31,7 @@ export async function createCryptoDeposit(
   // Guard against Infinity/NaN bypassing positive checks (e.g. 1e309 → Infinity)
   if (!Number.isFinite(amount) || amount <= 0) throw new AppError("Amount must be a valid positive number", 400);
   if (amount > 100_000_000) throw new AppError("Amount exceeds maximum allowed", 400);
+  amount = toMoney(amount); // round to cents
 
   const method = await prisma.depositMethod.findFirst({ where: { id: methodId, isActive: true } });
   if (!method) throw new AppError("Deposit method not found or inactive", 404);

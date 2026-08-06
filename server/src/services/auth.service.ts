@@ -60,10 +60,34 @@ export async function registerUser(data: {
   return user;
 }
 
-// ── Login ───────────────────────────────────────────────
+// ── Login (with account lockout) ───────────────────────
+// Per-account failed attempt tracking → temporary lockout after 5 failures.
+const failedAttempts = new Map<string, { count: number; lockUntil: number }>();
+const MAX_FAILED = 5;
+const LOCK_MS = 15 * 60 * 1000; // 15 minutes
+
+/** Reset failed-attempt tracking (used by admin unlock + tests). */
+export function resetFailedAttempts(email?: string) {
+  if (email) {
+    failedAttempts.delete(email.toLowerCase().trim());
+  } else {
+    failedAttempts.clear();
+  }
+}
+
 export async function loginUser(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const normalized = email.toLowerCase().trim();
+  const attempt = failedAttempts.get(normalized);
+
+  // Account temporarily locked?
+  if (attempt && attempt.lockUntil > Date.now()) {
+    const minsLeft = Math.ceil((attempt.lockUntil - Date.now()) / 60000);
+    throw new AppError(`Account temporarily locked. Try again in ${minsLeft} min.`, 423);
+  }
+
+  const user = await prisma.user.findUnique({ where: { email: normalized } });
   if (!user) {
+    // Rate-limit friendly: same message for unknown email
     throw new AppError("Invalid email or password", 401);
   }
 
@@ -73,8 +97,24 @@ export async function loginUser(email: string, password: string) {
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
-    throw new AppError("Invalid email or password", 401);
+    // Increment failed counter
+    const current = failedAttempts.get(normalized)?.count || 0;
+    const newCount = current + 1;
+    if (newCount >= MAX_FAILED) {
+      failedAttempts.set(normalized, { count: newCount, lockUntil: Date.now() + LOCK_MS });
+    } else {
+      failedAttempts.set(normalized, { count: newCount, lockUntil: 0 });
+    }
+    throw new AppError(
+      newCount >= MAX_FAILED
+        ? "Too many failed attempts. Account locked for 15 minutes."
+        : `Invalid email or password (${MAX_FAILED - newCount} attempts left)`,
+      401,
+    );
   }
+
+  // Success — reset failed counter
+  failedAttempts.delete(normalized);
 
   // Update last login
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
