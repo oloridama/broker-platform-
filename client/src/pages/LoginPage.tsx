@@ -129,13 +129,6 @@ export default function LoginPage() {
             Create one
           </Link>
         </p>
-
-        {/* Demo credentials hint */}
-        <div className="mt-4 p-3 rounded-lg bg-broker-800/50 border border-broker-700/50">
-          <p className="text-fluid-xs text-broker-400 text-center">
-            Demo: <span className="text-broker-300 font-mono">demo@fxatrade.live</span> / <span className="text-broker-300 font-mono">Admin123!</span>
-          </p>
-        </div>
       </div>
       </div>
       <Footer />

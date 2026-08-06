@@ -42,7 +42,7 @@ export default function MarketsPage() {
               className="input pl-10"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {["all", "crypto", "forex", "stocks"].map((f) => (
               <button
                 key={f}
@@ -64,7 +64,7 @@ export default function MarketsPage() {
         </div>
 
         {/* Price grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((p) => (
             <Link
               key={p.symbol}

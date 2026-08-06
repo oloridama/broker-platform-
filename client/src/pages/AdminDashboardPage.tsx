@@ -72,7 +72,7 @@ export default function AdminDashboardPage() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: () => get<AdminStats>("/admin/stats"),
-    refetchInterval: 15000,
+    refetchInterval: 30000,
   });
 
   const { data: users } = useQuery({
@@ -105,13 +105,13 @@ export default function AdminDashboardPage() {
   const { data: adminMethods } = useQuery({
     queryKey: ["admin-deposit-methods"],
     queryFn: () => get<AdminDepositMethod[]>("/deposits/admin/methods"),
-    refetchInterval: 15000,
+    refetchInterval: 30000,
   });
 
   const { data: pendingDeposits } = useQuery({
     queryKey: ["admin-pending-deposits"],
     queryFn: () => get<AdminPendingDeposit[]>("/deposits/admin/pending"),
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
 
   const toggleMethodMut = useMutation({

@@ -74,13 +74,13 @@ export default function TradingPage() {
   const { data: positions, isLoading: posLoading } = useQuery({
     queryKey: ["positions"],
     queryFn: () => get<Position[]>("/trading/positions"),
-    refetchInterval: 5000,
+    refetchInterval: 15000,
   });
 
   const { data: orders, isLoading: ordLoading } = useQuery({
     queryKey: ["orders"],
     queryFn: () => get<Order[]>("/trading/orders"),
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
 
   const createOrderMutation = useMutation({

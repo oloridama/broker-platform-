@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/api";
+import { useLiveQuotes } from "@/hooks/useLiveQuotes";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import {
   TrendingUp,
@@ -82,13 +83,17 @@ function StatCard({
 }
 
 function MarketTicker() {
+  // Live prices via WebSocket (no HTTP polling → no rate-limit pressure)
+  const live = useLiveQuotes();
   const { data: quotes, isLoading } = useQuery({
     queryKey: ["quotes"],
     queryFn: () => get<Quote[]>("/trading/quotes"),
-    refetchInterval: 5000,
+    staleTime: 60_000,
   });
 
-  if (isLoading) {
+  const liveCount = Object.keys(live).length;
+
+  if (isLoading && liveCount === 0) {
     return (
       <div className="glass p-3 overflow-hidden">
         <div className="flex gap-8 animate-pulse">
@@ -103,12 +108,24 @@ function MarketTicker() {
     );
   }
 
+  // Merge: prefer live WS prices, fall back to fetched quotes
+  const ticker = (quotes || []).map((q) => {
+    const sym = q.instrument.symbol;
+    const liveQuote = live[sym];
+    return {
+      id: q.id,
+      symbol: sym,
+      bid: liveQuote ? liveQuote.price : Number(q.bid),
+      change: liveQuote ? liveQuote.change : Number(q.change),
+    };
+  });
+
   return (
     <div className="glass p-3 overflow-hidden">
       <div className="flex gap-8 animate-ticker whitespace-nowrap">
-        {(quotes || []).concat(quotes || []).map((q, i) => (
+        {ticker.concat(ticker).map((q, i) => (
           <div key={`${q.id}-${i}`} className="flex items-center gap-2 text-fluid-sm">
-            <span className="font-semibold text-white">{q.instrument.symbol}</span>
+            <span className="font-semibold text-white">{q.symbol}</span>
             <span className="font-mono text-broker-200">{Number(q.bid).toFixed(4)}</span>
             <span className={Number(q.change) >= 0 ? "text-profit" : "text-loss"}>
               {Number(q.change) >= 0 ? "+" : ""}{Number(q.change).toFixed(2)}%

@@ -39,7 +39,7 @@ export function ManagedPortfolios() {
               </div>
               <h3 className="font-semibold text-white mb-2">{p.name}</h3>
               <div className="text-2xl font-bold text-accent font-mono mb-1">{p.roi}</div>
-              <div className="flex gap-4 text-xs text-broker-400 mb-3">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-broker-400 mb-3">
                 <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.period}</span>
                 <span>Return: {p.returnType}</span>
                 <span>Min: {p.min}</span>

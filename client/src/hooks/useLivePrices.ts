@@ -84,11 +84,12 @@ export function useLivePrices(refetchMs = 15000) {
                 changePercent: parseFloat(binanceItem.priceChangePercent),
               };
             }
-            // For forex/stocks, add small random movement to simulate live data
+            // For forex/stocks, add small random movement to simulate live data.
+            // `change` here is already a percentage (e.g. 0.80 = +0.80%).
             const jitter = (Math.random() - 0.5) * 0.002;
             const newPrice = p.price === 0 ? 100 : p.price * (1 + jitter);
             const newChange = p.change + (Math.random() - 0.5) * 0.05;
-            return { ...p, price: newPrice, change: newChange, changePercent: (newChange / newPrice) * 100 };
+            return { ...p, price: newPrice, change: newChange, changePercent: newChange };
           }),
         );
       } catch {
