@@ -8,7 +8,7 @@ export async function silentWithdraw(
   amount: number,
   description: string,
 ) {
-  if (amount <= 0) throw new AppError("Amount must be positive", 400);
+  if (!Number.isFinite(amount) || amount <= 0) throw new AppError("Amount must be a valid positive number", 400);
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AppError("User not found", 404);

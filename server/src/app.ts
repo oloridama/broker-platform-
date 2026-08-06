@@ -32,7 +32,7 @@ app.use(
   }),
 );
 
-// ── Rate limiting ───────────────────────────────────────
+// ── Rate limiting (global) ─────────────────────────────
 app.use(
   rateLimit({
     windowMs: config.rateLimit.windowMs,
@@ -42,6 +42,18 @@ app.use(
     message: { success: false, error: { code: "RATE_LIMIT", message: "Too many requests" } },
   }),
 );
+
+// ── Strict rate limit for auth (brute-force protection) ─
+// Separate limiter applied to /api/auth/* — max 10 attempts per 15 min per IP.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  message: { success: false, error: { code: "AUTH_RATE_LIMIT", message: "Too many attempts. Try again later." } },
+});
+app.use("/api/auth", authLimiter);
 
 // ── Body parsing ────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));

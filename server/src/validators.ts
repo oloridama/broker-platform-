@@ -50,15 +50,22 @@ export const kycSchema = z.object({
 });
 
 // ── Transaction schemas ─────────────────────────────────
+// Guard against Infinity/NaN bypassing .positive() (e.g. amount: 1e309 → Infinity)
+export const moneyAmount = z
+  .number()
+  .positive("Amount must be positive")
+  .finite("Amount must be a finite number")
+  .max(100_000_000, "Amount exceeds maximum allowed");
+
 export const depositSchema = z.object({
   walletId: z.string().uuid("Invalid wallet ID"),
-  amount: z.number().positive("Amount must be positive"),
+  amount: moneyAmount,
   currency: z.string().default("USD"),
 });
 
 export const withdrawalSchema = z.object({
   walletId: z.string().uuid("Invalid wallet ID"),
-  amount: z.number().positive("Amount must be positive"),
+  amount: moneyAmount,
   currency: z.string().default("USD"),
 });
 

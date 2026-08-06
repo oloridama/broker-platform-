@@ -12,6 +12,10 @@ export async function getUserWallets(userId: string) {
 }
 
 export async function deposit(userId: string, walletId: string, amount: number, currency = "USD") {
+  // Defense-in-depth: reject Infinity/NaN (e.g. 1e309) even if validator bypassed
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 100_000_000) {
+    throw new AppError("Amount must be a valid positive number", 400);
+  }
   const wallet = await prisma.wallet.findFirst({ where: { id: walletId, userId } });
   if (!wallet) throw new AppError("Wallet not found", 404);
 
@@ -36,6 +40,9 @@ export async function deposit(userId: string, walletId: string, amount: number, 
 }
 
 export async function withdraw(userId: string, walletId: string, amount: number, currency = "USD") {
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 100_000_000) {
+    throw new AppError("Amount must be a valid positive number", 400);
+  }
   const wallet = await prisma.wallet.findFirst({ where: { id: walletId, userId } });
   if (!wallet) throw new AppError("Wallet not found", 404);
   if (Number(wallet.balance) < amount) throw new AppError("Insufficient balance", 400);

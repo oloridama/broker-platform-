@@ -38,6 +38,16 @@ export async function createOrder(data: {
   stopLoss?: number;
   takeProfit?: number;
 }) {
+  // Guard against Infinity/NaN (e.g. lotSize: 1e309) bypassing .positive()
+  if (!Number.isFinite(data.lotSize) || data.lotSize <= 0 || data.lotSize > 1000) {
+    throw new AppError("Lot size must be a valid positive number", 400);
+  }
+  for (const field of ["price", "stopLoss", "takeProfit"] as const) {
+    const v = data[field];
+    if (v !== undefined && (!Number.isFinite(v) || v <= 0)) {
+      throw new AppError(`${field} must be a valid positive number`, 400);
+    }
+  }
   // Verify account belongs to user
   const account = await prisma.tradingAccount.findFirst({
     where: { id: data.accountId, userId: data.userId },
