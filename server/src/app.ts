@@ -15,6 +15,7 @@ import userRoutes from "./routes/user.routes";
 import botRoutes from "./routes/bot.routes";
 import adminRoutes from "./routes/admin.routes";
 import depositRoutes from "./routes/deposit.routes";
+import marketRoutes from "./routes/market.routes";
 
 // ── Initialise Express ──────────────────────────────────
 const app = express();
@@ -81,6 +82,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/bots", botRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/deposits", depositRoutes);
+app.use("/api/markets", marketRoutes);
 
 // ── 404 handler ─────────────────────────────────────────
 app.use((_req, res) => {
