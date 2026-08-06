@@ -7,3 +7,4 @@ coverage/
 .turbo/
 *.db
 *.tsbuildinfo
+tmp_*.png
