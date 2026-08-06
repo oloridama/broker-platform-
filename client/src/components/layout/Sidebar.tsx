@@ -6,6 +6,7 @@ import {
   User,
   X,
   BarChart3,
+  Bot,
 } from "lucide-react";
 import { useUIStore } from "@/store/uiStore";
 import { clsx } from "clsx";
@@ -13,6 +14,7 @@ import { clsx } from "clsx";
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/trading", icon: TrendingUp, label: "Trading" },
+  { to: "/bots", icon: Bot, label: "Bots" },
   { to: "/wallet", icon: Wallet, label: "Wallet" },
   { to: "/profile", icon: User, label: "Profile" },
 ];

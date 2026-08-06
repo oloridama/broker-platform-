@@ -3,6 +3,7 @@ import { config } from "./config";
 import prisma from "./db";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import { startBotScheduler } from "./botScheduler";
 
 async function main() {
   try {
@@ -51,6 +52,9 @@ async function main() {
     console.log(`   WebSocket:   ws://localhost:${config.port}/ws`);
     console.log(`   Health:      http://localhost:${config.port}/api/health\n`);
   });
+
+  // Start the automated trading-bot scheduler
+  startBotScheduler();
 }
 
 // Graceful shutdown

@@ -23,6 +23,7 @@ model User {
   orders             Order[]
   wallets            Wallet[]
   bots               Bot[]
+  botTrades          BotTrade[]
   withdrawalRequests WithdrawalRequest[]
   pendingDeposits    PendingDeposit[]
   kyc                Kyc?
@@ -211,8 +212,32 @@ model Bot {
   tradesCount   Int      @default(0)
   uptimeSeconds Int      @default(0)
   lastRunAt     DateTime?
+  allocation    Float    @default(1000)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  trades        BotTrade[]
+  @@index([userId])
+  @@index([status])
+}
+
+model BotTrade {
+  id         String   @id @default(uuid())
+  botId      String
+  bot        Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol     String
+  side       String   @default("BUY")
+  entryPrice Float
+  exitPrice  Float?
+  quantity   Float    @default(0)
+  pnl        Float    @default(0)
+  status     String   @default("OPEN") // OPEN | CLOSED
+  reason     String   @default("")
+  openedAt   DateTime @default(now())
+  closedAt   DateTime?
+  createdAt  DateTime @default(now())
+  @@index([botId])
   @@index([userId])
   @@index([status])
 }

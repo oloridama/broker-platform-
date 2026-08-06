@@ -19,9 +19,15 @@ export async function getUserBots(req: Request, res: Response) {
 }
 
 export async function create(req: Request, res: Response) {
-  const { templateIndex, config } = req.body;
-  const bot = await botService.createBot(req.user!.sub, templateIndex, config);
+  const { templateIndex, config, allocation } = req.body;
+  const bot = await botService.createBot(req.user!.sub, templateIndex, config, allocation);
   res.status(201).json(success(bot));
+}
+
+export async function getTrades(req: Request, res: Response) {
+  const limit = Number(req.query.limit) || 50;
+  const trades = await botService.getBotTrades(req.params.id, req.user!.sub, limit);
+  res.json(success(trades));
 }
 
 export async function toggle(req: Request, res: Response) {

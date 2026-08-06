@@ -20,6 +20,7 @@ const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
 const TradingPage = lazy(() => import("@/pages/TradingPage"));
 const WalletPage = lazy(() => import("@/pages/WalletPage"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
+const BotDashboardPage = lazy(() => import("@/pages/BotDashboardPage"));
 const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/trading" element={<TradingPage />} />
+          <Route path="/bots" element={<BotDashboardPage />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>

@@ -99,3 +99,8 @@ export async function patch<T>(url: string, body?: unknown): Promise<T> {
   const { data } = await api.patch<ApiResponse<T>>(url, body);
   return data.data;
 }
+
+export async function del<T>(url: string): Promise<T> {
+  const { data } = await api.delete<ApiResponse<T>>(url);
+  return data.data;
+}

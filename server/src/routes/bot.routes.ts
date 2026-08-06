@@ -13,6 +13,7 @@ router.get("/", asyncHandler(ctrl.getUserBots));
 router.post("/", asyncHandler(ctrl.create));
 router.post("/:id/toggle", asyncHandler(ctrl.toggle));
 router.post("/:id/simulate", asyncHandler(ctrl.simulate));
+router.get("/:id/trades", asyncHandler(ctrl.getTrades));
 router.delete("/:id", asyncHandler(ctrl.remove));
 
 export default router;

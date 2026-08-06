@@ -87,12 +87,33 @@ export async function getUserBots(userId: string) {
   return prisma.bot.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
+    include: { _count: { select: { trades: true } } },
   });
 }
 
-export async function createBot(userId: string, templateIndex: number, config?: Record<string, unknown>) {
+export async function getBotTrades(botId: string, userId: string, limit = 50) {
+  const bot = await prisma.bot.findFirst({ where: { id: botId, userId } });
+  if (!bot) throw new AppError("Bot not found", 404);
+
+  return prisma.botTrade.findMany({
+    where: { botId },
+    orderBy: { createdAt: "desc" },
+    take: Math.min(limit, 100),
+  });
+}
+
+export async function createBot(
+  userId: string,
+  templateIndex: number,
+  config?: Record<string, unknown>,
+  allocation: number = 1000,
+) {
   const template = BOT_TEMPLATES[templateIndex];
   if (!template) throw new AppError("Bot template not found", 404);
+
+  const safeAllocation = Number.isFinite(allocation) && allocation > 0
+    ? Math.min(allocation, 1_000_000)
+    : 1000;
 
   const bot = await prisma.bot.create({
     data: {
@@ -106,6 +127,7 @@ export async function createBot(userId: string, templateIndex: number, config?: 
       targetPairs: template.targetPairs.join(","),
       exchanges: template.exchanges.join(","),
       config: JSON.stringify(config || {}),
+      allocation: safeAllocation,
     },
   });
 
@@ -128,30 +150,27 @@ export async function toggleBot(botId: string, userId: string, action: "start" |
   return prisma.bot.update({ where: { id: botId }, data: updateData });
 }
 
+/**
+ * Manual bot tick (used by POST /api/bots/:id/simulate).
+ * Delegates to the real engine: MA+RSI uses live signals, others simulate.
+ */
 export async function simulateBotProfit(botId: string, userId: string) {
   const bot = await prisma.bot.findFirst({ where: { id: botId, userId } });
   if (!bot) throw new AppError("Bot not found", 404);
   if (bot.status !== "ACTIVE") throw new AppError("Bot is not active", 400);
 
-  // MA+RSI strategy: higher win rate due to dual-confirmation signals
-  const isMARsi = bot.strategy === "ma_rsi_crossover";
-  const baseChance = isMARsi ? 0.68 : 0.55; // 68% win rate for MA+RSI
-  const won = Math.random() < baseChance;
-
-  const yieldPct = won
-    ? (Math.random() * (Number(bot.dailyYieldMax) - Number(bot.dailyYieldMin)) + Number(bot.dailyYieldMin)) / 100 / 24
-    : -(Math.random() * Number(bot.dailyYieldMin) / 100 / 24);
-
-  const profitAmount = yieldPct * 1000; // assume 1000 USDT base
-
-  return prisma.bot.update({
-    where: { id: botId },
-    data: {
-      totalProfit: { increment: profitAmount },
-      tradesCount: { increment: 1 },
-      uptimeSeconds: { increment: 300 }, // 5-min candles
-    },
+  const { tickBot, persistTick } = await import("./bot.engine");
+  const trade = await tickBot({
+    id: bot.id,
+    strategy: bot.strategy,
+    targetPairs: bot.targetPairs,
+    allocation: bot.allocation,
   });
+  if (!trade) {
+    throw new AppError("No trade signal this tick — try again later", 202);
+  }
+  const record = await persistTick(bot.id, bot.userId, trade);
+  return { botId: bot.id, trade: record };
 }
 
 // ── ROI Calculator ─────────────────────────────────────

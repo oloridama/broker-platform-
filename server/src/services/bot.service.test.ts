@@ -67,6 +67,7 @@ describe("Bot Service", () => {
       expect(prisma.bot.findMany).toHaveBeenCalledWith({
         where: { userId: "user-123" },
         orderBy: { createdAt: "desc" },
+        include: { _count: { select: { trades: true } } },
       });
     });
   });
