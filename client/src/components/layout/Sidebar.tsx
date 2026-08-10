@@ -27,10 +27,14 @@ export function Sidebar() {
   return (
     <aside
       className={clsx(
-        "fixed md:sticky top-0 left-0 z-40 h-screen",
+        "fixed md:sticky top-0 left-0 z-40 h-screen overflow-hidden",
         "bg-broker-800 border-r border-broker-700/50",
         "flex flex-col transition-all duration-300 ease-in-out",
-        sidebarOpen ? "w-[260px] translate-x-0" : "w-0 -translate-x-full md:w-[70px] md:translate-x-0",
+        // Mobile: full 260px width, slide fully off-screen when closed.
+        // (translate-x-full is % of own width, so a w-0 element would never move!)
+        sidebarOpen
+          ? "w-[260px] translate-x-0 md:translate-x-0"
+          : "-translate-x-full md:w-[70px] md:translate-x-0 w-[260px]",
       )}
       aria-label="Main navigation"
     >

@@ -23,7 +23,28 @@ import marketRoutes from "./routes/market.routes";
 const app = express();
 
 // ── Security headers ────────────────────────────────────
-app.use(helmet());
+// CSP is configured to allow the live-data sources the frontend needs:
+// Binance (crypto prices), Google Fonts, same-origin API/WebSocket, and the
+// Cloudflare Insights beacon. Helmet's default CSP would block all of these.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        "default-src": ["'self'"],
+        "script-src": ["'self'", "https://static.cloudflareinsights.com"],
+        "connect-src": ["'self'", "https://api.binance.com", "wss:", "https:"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
+        "img-src": ["'self'", "data:", "https:"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+        "frame-ancestors": ["'self'"],
+        "upgrade-insecure-requests": [],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
 // ── CORS ────────────────────────────────────────────────
 app.use(
