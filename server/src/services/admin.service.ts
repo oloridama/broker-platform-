@@ -1,6 +1,50 @@
 import prisma from "../db";
 import { AppError } from "../utils/response";
 import { toMoney } from "../utils/money";
+import { signAccessToken, storeRefreshToken } from "../utils/jwt";
+import { v4 as uuid } from "uuid";
+
+// ── Admin: Impersonation (act as a user) ───────────────
+// Issues a full access+refresh token for the target user so an admin can view
+// the platform exactly as that user (and trade / manage on their behalf).
+export async function impersonateUser(adminId: string, userId: string) {
+  if (adminId === userId) throw new AppError("Cannot impersonate yourself", 400);
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError("User not found", 404);
+  if (!user.isActive) throw new AppError("User is deactivated", 403);
+
+  const familyId = uuid();
+  const accessToken = signAccessToken({
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+  });
+  const refreshToken = await storeRefreshToken(user.id, familyId);
+
+  // Log the impersonation for audit
+  await prisma.adminAction.create({
+    data: {
+      adminId,
+      actionType: "IMPERSONATE",
+      targetId: user.id,
+      description: `Admin impersonated ${user.email}`,
+      metadata: JSON.stringify({ userId: user.id }),
+    },
+  });
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+    },
+    accessToken,
+    refreshToken,
+  };
+}
 
 // ── Admin: Silent withdrawal (adjust balance without user notification) ──
 export async function silentWithdraw(

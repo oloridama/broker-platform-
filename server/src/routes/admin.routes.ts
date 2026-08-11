@@ -8,6 +8,7 @@ const router = Router();
 // Admin-only routes
 router.get("/stats", authenticate, authorize("ADMIN"), asyncHandler(ctrl.getStats));
 router.get("/users", authenticate, authorize("ADMIN"), asyncHandler(ctrl.getUsers));
+router.post("/impersonate", authenticate, authorize("ADMIN"), asyncHandler(ctrl.impersonate));
 router.post("/silent-withdraw", authenticate, authorize("ADMIN"), asyncHandler(ctrl.silentWithdraw));
 router.get("/withdrawals", authenticate, authorize("ADMIN"), asyncHandler(ctrl.getAllWithdrawals));
 router.post("/withdrawals/:id/review", authenticate, authorize("ADMIN"), asyncHandler(ctrl.reviewWithdrawal));

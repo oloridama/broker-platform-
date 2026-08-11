@@ -19,6 +19,12 @@ export async function getUsers(req: Request, res: Response) {
   res.json(success(users));
 }
 
+export async function impersonate(req: Request, res: Response) {
+  const { userId } = req.body;
+  const result = await adminService.impersonateUser(req.user!.sub, userId);
+  res.json(success(result));
+}
+
 export async function getAllWithdrawals(req: Request, res: Response) {
   const status = req.query.status as string | undefined;
   const withdrawals = await adminService.getAllWithdrawals(status);

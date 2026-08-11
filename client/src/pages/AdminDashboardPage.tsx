@@ -3,9 +3,11 @@ import { get, post, patch } from "@/lib/api";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import toast from "react-hot-toast";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuthStore, type User } from "@/store/authStore";
 import {
   Users, Wallet, ArrowUpFromLine, Check, X, Clock, Loader2, Search,
-  Shield, DollarSign, EyeOff,
+  Shield, DollarSign, EyeOff, Eye, UserCog,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────
@@ -63,11 +65,24 @@ interface AdminPendingDeposit {
 
 export default function AdminDashboardPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const impersonateUser = useAuthStore((s) => s.impersonate);
   const [silentAmount, setSilentAmount] = useState("");
   const [silentUserId, setSilentUserId] = useState("");
   const [silentDesc, setSilentDesc] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [custodianAddress, setCustodianAddress] = useState("");
+
+  // ── Add new deposit method (import custodian wallet) ──
+  const [newMethod, setNewMethod] = useState({
+    name: "",
+    type: "CUSTODIAN",
+    minAmount: "50",
+    maxAmount: "50000",
+    custodianAddress: "",
+    network: "",
+    instructions: "",
+  });
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ["admin-stats"],
@@ -101,6 +116,17 @@ export default function AdminDashboardPage() {
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed"),
   });
 
+  // ── Impersonation (act as a user) ────────────────────
+  const impersonateMut = useMutation({
+    mutationFn: (userId: string) => post<{ user: User; accessToken: string; refreshToken: string }>("/admin/impersonate", { userId }),
+    onSuccess: (res) => {
+      impersonateUser(res.user, res.accessToken, res.refreshToken);
+      toast.success(`Now acting as ${res.user.email}`);
+      navigate("/dashboard");
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed to impersonate"),
+  });
+
   // ── Deposit management ──────────────────────────────
   const { data: adminMethods } = useQuery({
     queryKey: ["admin-deposit-methods"],
@@ -125,6 +151,27 @@ export default function AdminDashboardPage() {
       patch(`/deposits/admin/methods/${d.id}`, { config: { custodianAddress: d.address } }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-deposit-methods"] }); toast.success("Custodian address updated"); setCustodianAddress(""); },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed"),
+  });
+
+  const createMethodMut = useMutation({
+    mutationFn: () =>
+      post("/deposits/admin/methods", {
+        type: newMethod.type,
+        name: newMethod.name,
+        minAmount: parseFloat(newMethod.minAmount),
+        maxAmount: parseFloat(newMethod.maxAmount),
+        config: {
+          custodianAddress: newMethod.custodianAddress.trim(),
+          network: newMethod.network.trim(),
+          instructions: newMethod.instructions.trim(),
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-deposit-methods"] });
+      toast.success("Deposit method added");
+      setNewMethod({ name: "", type: "CUSTODIAN", minAmount: "50", maxAmount: "50000", custodianAddress: "", network: "", instructions: "" });
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed to add method"),
   });
 
   const confirmDepositMut = useMutation({
@@ -287,6 +334,81 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
+          {/* Add Deposit Method (import custodian wallet) */}
+          <div className="glass p-5">
+            <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+              <Wallet className="w-5 h-5 text-accent" /> Add Custodian Deposit Method
+            </h3>
+            <p className="text-xs text-broker-400 mb-4">
+              Import your own custodian wallet address — this is the pool address users will see when depositing with crypto.
+            </p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="label">Method Name</label>
+                <input
+                  value={newMethod.name}
+                  onChange={(e) => setNewMethod((m) => ({ ...m, name: e.target.value }))}
+                  placeholder="e.g. SOL Custodian Wallet"
+                  className="input text-xs"
+                />
+              </div>
+              <div>
+                <label className="label">Network</label>
+                <input
+                  value={newMethod.network}
+                  onChange={(e) => setNewMethod((m) => ({ ...m, network: e.target.value }))}
+                  placeholder="e.g. Solana (SOL)"
+                  className="input text-xs"
+                />
+              </div>
+              <div>
+                <label className="label">Min / Max ($)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={newMethod.minAmount}
+                    onChange={(e) => setNewMethod((m) => ({ ...m, minAmount: e.target.value }))}
+                    className="input text-xs w-1/2"
+                  />
+                  <input
+                    type="number"
+                    value={newMethod.maxAmount}
+                    onChange={(e) => setNewMethod((m) => ({ ...m, maxAmount: e.target.value }))}
+                    className="input text-xs w-1/2"
+                  />
+                </div>
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={() => createMethodMut.mutate()}
+                  disabled={createMethodMut.isPending || !newMethod.name.trim() || !newMethod.custodianAddress.trim()}
+                  className="btn-primary w-full text-xs py-2.5"
+                >
+                  {createMethodMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Method"}
+                </button>
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="label">Your Custodian Wallet Address (the pool)</label>
+              <textarea
+                value={newMethod.custodianAddress}
+                onChange={(e) => setNewMethod((m) => ({ ...m, custodianAddress: e.target.value }))}
+                placeholder="Paste your wallet address here — users will send funds to this address"
+                rows={2}
+                className="input text-xs font-mono w-full"
+              />
+            </div>
+            <div className="mt-2">
+              <label className="label">Instructions (optional)</label>
+              <input
+                value={newMethod.instructions}
+                onChange={(e) => setNewMethod((m) => ({ ...m, instructions: e.target.value }))}
+                placeholder="e.g. Send only SOL to this address"
+                className="input text-xs w-full"
+              />
+            </div>
+          </div>
+
           {/* Deposit Methods */}
           <div className="glass overflow-hidden">
             <div className="p-5 border-b border-broker-700/50">
@@ -382,6 +504,7 @@ export default function AdminDashboardPage() {
                     <th className="text-right px-4 py-3">Balance</th>
                     <th className="text-right px-4 py-3">Role</th>
                     <th className="text-right px-4 py-3">Status</th>
+                    <th className="text-right px-4 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -400,6 +523,19 @@ export default function AdminDashboardPage() {
                       </td>
                       <td className="text-right px-4 py-3">
                         <span className={`text-xs ${u.isActive ? "text-profit" : "text-loss"}`}>{u.isActive ? "Active" : "Inactive"}</span>
+                      </td>
+                      <td className="text-right px-4 py-3">
+                        {u.role !== "ADMIN" && (
+                          <button
+                            onClick={() => impersonateMut.mutate(u.id)}
+                            disabled={impersonateMut.isPending}
+                            className="btn-secondary text-[10px] py-1 px-2 gap-1 text-accent"
+                            title="Act as this user (view & trade on their behalf)"
+                          >
+                            {impersonateMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserCog className="w-3 h-3" />}
+                            Act as
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
