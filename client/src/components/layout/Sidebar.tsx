@@ -7,8 +7,10 @@ import {
   X,
   BarChart3,
   Bot,
+  Shield,
 } from "lucide-react";
 import { useUIStore } from "@/store/uiStore";
+import { useAuthStore } from "@/store/authStore";
 import { clsx } from "clsx";
 
 const navItems = [
@@ -22,6 +24,8 @@ const navItems = [
 export function Sidebar() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === "ADMIN";
   const location = useLocation();
 
   return (
@@ -84,6 +88,28 @@ export function Sidebar() {
             </NavLink>
           );
         })}
+
+        {/* Admin Panel — only visible to ADMIN users */}
+        {isAdmin && (
+          <NavLink
+            key="/admin"
+            to="/admin"
+            onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
+            className={clsx(
+              "flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200",
+              "min-h-[44px] whitespace-nowrap",
+              location.pathname.startsWith("/admin")
+                ? "bg-accent/10 text-accent border border-accent/20"
+                : "text-broker-300 hover:bg-broker-700/50 hover:text-broker-100",
+            )}
+            aria-current={location.pathname.startsWith("/admin") ? "page" : undefined}
+          >
+            <Shield className="w-5 h-5 shrink-0" aria-hidden="true" />
+            <span className={clsx("text-fluid-sm font-medium", !sidebarOpen && "md:hidden")}>
+              Admin Panel
+            </span>
+          </NavLink>
+        )}
       </nav>
 
       {/* Footer */}
