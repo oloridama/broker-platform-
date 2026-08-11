@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+// ── Shared ──────────────────────────────────────────────
+// Reject HTML/script content in free-text name fields (XSS defense).
+// Allows letters (incl. accents), spaces, hyphens, apostrophes and periods.
+export const nameField = z
+  .string()
+  .min(1, "Name is required")
+  .max(100, "Name is too long")
+  .regex(/^[A-Za-zÀ-ÖØ-öø-ÿ' .\-]+$/, "Name contains invalid characters");
+
 // ── Auth schemas ────────────────────────────────────────
 export const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -8,8 +17,8 @@ export const registerSchema = z.object({
     .min(8, "Password must be at least 8 characters")
     .regex(/[A-Z]/, "Password must contain an uppercase letter")
     .regex(/[0-9]/, "Password must contain a number"),
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
+  firstName: nameField,
+  lastName: nameField,
 });
 
 export const loginSchema = z.object({
@@ -71,6 +80,6 @@ export const withdrawalSchema = z.object({
 
 // ── Profile schema ──────────────────────────────────────
 export const updateProfileSchema = z.object({
-  firstName: z.string().min(1).optional(),
-  lastName: z.string().min(1).optional(),
+  firstName: nameField.optional(),
+  lastName: nameField.optional(),
 });
