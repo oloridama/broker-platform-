@@ -8,6 +8,12 @@ export async function silentWithdraw(req: Request, res: Response) {
   res.json(success(result));
 }
 
+export async function adjustBalance(req: Request, res: Response) {
+  const { userId, amount, description } = req.body;
+  const result = await adminService.adjustBalance(req.user!.sub, userId, amount, description);
+  res.json(success(result));
+}
+
 export async function getStats(req: Request, res: Response) {
   const stats = await adminService.getAdminStats();
   res.json(success(stats));

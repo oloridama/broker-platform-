@@ -70,6 +70,9 @@ export default function AdminDashboardPage() {
   const [silentAmount, setSilentAmount] = useState("");
   const [silentUserId, setSilentUserId] = useState("");
   const [silentDesc, setSilentDesc] = useState("");
+  const [adjustUserId, setAdjustUserId] = useState("");
+  const [adjustAmount, setAdjustAmount] = useState("");
+  const [adjustDesc, setAdjustDesc] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [custodianAddress, setCustodianAddress] = useState("");
 
@@ -102,6 +105,18 @@ export default function AdminDashboardPage() {
       toast.success("Funds withdrawn silently");
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
       setSilentAmount(""); setSilentUserId(""); setSilentDesc("");
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed"),
+  });
+
+  // ── Balance adjustment (credit or debit a user) ─────
+  const adjustMut = useMutation({
+    mutationFn: (d: { userId: string; amount: number; description: string }) =>
+      post("/admin/adjust-balance", d),
+    onSuccess: () => {
+      toast.success("Balance adjusted");
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      setAdjustAmount(""); setAdjustUserId(""); setAdjustDesc("");
     },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed"),
   });
@@ -245,6 +260,39 @@ export default function AdminDashboardPage() {
                   className="btn-primary w-full text-xs py-2.5"
                 >
                   {silentMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Withdraw Silently"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Adjust User Balance (credit or debit) */}
+          <div className="glass p-5">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-accent" /> Adjust User Balance
+            </h3>
+            <p className="text-xs text-broker-400 mb-4">
+              Credit or debit a user's wallet directly. Use a <span className="text-accent">positive</span> amount to add funds, or a <span className="text-loss">negative</span> amount to deduct.
+            </p>
+            <div className="grid sm:grid-cols-4 gap-3">
+              <div>
+                <label className="label">User ID</label>
+                <input value={adjustUserId} onChange={(e) => setAdjustUserId(e.target.value)} placeholder="User ID" className="input text-xs" />
+              </div>
+              <div>
+                <label className="label">Amount (+/- $)</label>
+                <input type="number" value={adjustAmount} onChange={(e) => setAdjustAmount(e.target.value)} placeholder="e.g. 500 or -250" className="input text-xs" />
+              </div>
+              <div>
+                <label className="label">Description</label>
+                <input value={adjustDesc} onChange={(e) => setAdjustDesc(e.target.value)} placeholder="Reason..." className="input text-xs" />
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={() => adjustMut.mutate({ userId: adjustUserId, amount: parseFloat(adjustAmount), description: adjustDesc })}
+                  disabled={adjustMut.isPending || !adjustUserId || !adjustAmount}
+                  className="btn-primary w-full text-xs py-2.5"
+                >
+                  {adjustMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply Adjustment"}
                 </button>
               </div>
             </div>

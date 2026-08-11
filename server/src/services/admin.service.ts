@@ -86,6 +86,53 @@ export async function silentWithdraw(
   return { success: true, newBalance: Number(wallet.balance) - amount };
 }
 
+/**
+ * Admin balance adjustment — add (+) or deduct (−) from a user's wallet,
+ * recorded as an admin action but NOT visible to the user as a normal
+ * transaction (used to credit deposits, bonuses, corrections, etc.).
+ */
+export async function adjustBalance(
+  adminId: string,
+  userId: string,
+  amount: number,
+  description: string,
+) {
+  if (!Number.isFinite(amount) || amount === 0) {
+    throw new AppError("Amount must be a valid non-zero number", 400);
+  }
+  amount = toMoney(amount);
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError("User not found", 404);
+
+  const wallet = await prisma.wallet.findFirst({
+    where: { userId, isDefault: true },
+  });
+  if (!wallet) throw new AppError("No wallet found", 404);
+
+  const newBalance = Number(wallet.balance) + amount;
+  if (newBalance < 0) throw new AppError("Insufficient balance", 400);
+
+  await prisma.wallet.update({
+    where: { id: wallet.id },
+    data: { balance: newBalance },
+  });
+
+  const direction = amount > 0 ? "credit" : "debit";
+  const actionType = amount > 0 ? "BALANCE_CREDIT" : "BALANCE_DEBIT";
+  await prisma.adminAction.create({
+    data: {
+      adminId,
+      actionType,
+      targetId: userId,
+      description: `${description} — ${direction} $${Math.abs(amount)} for ${user.email}`,
+      metadata: JSON.stringify({ amount, userId, walletId: wallet.id, newBalance }),
+    },
+  });
+
+  return { success: true, newBalance };
+}
+
 // ── User withdrawal request management ─────────────────
 export async function createWithdrawalRequest(
   userId: string,
