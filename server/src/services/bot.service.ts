@@ -102,6 +102,68 @@ export async function getBotTrades(botId: string, userId: string, limit = 50) {
   });
 }
 
+/**
+ * Build a real equity curve from the user's closed bot-trade history.
+ * Anchors the end of the curve at the user's current trading-account balance
+ * and walks backwards, subtracting each trade's realized P&L.
+ */
+export async function getEquityCurve(userId: string) {
+  const accounts = await prisma.tradingAccount.findMany({
+    where: { userId, isActive: true },
+  });
+  const currentBalance = accounts.reduce((s, a) => s + Number(a.balance), 0);
+
+  const trades = await prisma.botTrade.findMany({
+    where: { userId, status: "CLOSED" },
+    orderBy: { createdAt: "asc" },
+    select: { pnl: true, createdAt: true },
+  });
+
+  const points: { time: string; equity: number; pnl: number }[] = [];
+  const totalPnl = trades.reduce((s, t) => s + Number(t.pnl), 0);
+
+  // No history at all → flat line anchored at the current balance so the chart renders
+  if (trades.length === 0) {
+    const now = new Date().toISOString();
+    const ago = new Date(Date.now() - 6 * 86_400_000).toISOString();
+    return [
+      { time: ago, equity: round2(currentBalance), pnl: 0 },
+      { time: now, equity: round2(currentBalance), pnl: 0 },
+    ];
+  }
+
+  // Start point: balance before any recorded bot P&L
+  const start = new Date(trades[0].createdAt);
+  start.setMinutes(start.getMinutes() - 5);
+  points.push({ time: start.toISOString(), equity: round2(currentBalance - totalPnl), pnl: 0 });
+
+  // Walk forward, reconstructing equity from realized P&L
+  let cum = 0;
+  for (const t of trades) {
+    cum += Number(t.pnl);
+    points.push({
+      time: new Date(t.createdAt).toISOString(),
+      equity: round2(currentBalance - (totalPnl - cum)),
+      pnl: round2(cum),
+    });
+  }
+
+  // End anchor: today's balance
+  points.push({ time: new Date().toISOString(), equity: round2(currentBalance), pnl: round2(totalPnl) });
+
+  // Downsample to at most 200 points, always keeping the newest
+  if (points.length > 200) {
+    const step = Math.ceil(points.length / 200);
+    return points.filter((_, i) => i % step === 0 || i === points.length - 1);
+  }
+
+  return points;
+}
+
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
 export async function createBot(
   userId: string,
   templateIndex: number,

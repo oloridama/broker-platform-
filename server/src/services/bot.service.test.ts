@@ -13,6 +13,12 @@ vi.mock("../db", () => ({
     user: {
       findUnique: vi.fn(),
     },
+    tradingAccount: {
+      findMany: vi.fn(),
+    },
+    botTrade: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -68,6 +74,61 @@ describe("Bot Service", () => {
         where: { userId: "user-123" },
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { trades: true } } },
+      });
+    });
+  });
+
+  describe("getEquityCurve", () => {
+    it("should reconstruct equity from closed bot-trade P&L history", async () => {
+      (prisma.tradingAccount.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { balance: "100000" },
+      ]);
+      (prisma.botTrade.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { pnl: 10, createdAt: new Date("2026-08-10T00:00:00.000Z") },
+        { pnl: -5, createdAt: new Date("2026-08-11T00:00:00.000Z") },
+      ]);
+
+      const points = await botService.getEquityCurve("user-123");
+
+      // start + 2 trades + end anchor
+      expect(points.length).toBe(4);
+      // start point = current balance minus total realized P&L (10 - 5 = 5)
+      expect(points[0].equity).toBe(99995);
+      expect(points[0].pnl).toBe(0);
+      // after first trade: current - (totalPnl - cum) = 100000 - (5 - 10) = 100005
+      expect(points[1].equity).toBe(100005);
+      expect(points[1].pnl).toBe(10);
+      // end anchor = current balance
+      expect(points[points.length - 1].equity).toBe(100000);
+      expect(points[points.length - 1].pnl).toBe(5);
+    });
+
+    it("should return a flat 2-point curve when there is no history", async () => {
+      (prisma.tradingAccount.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { balance: "5000" },
+      ]);
+      (prisma.botTrade.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+      const points = await botService.getEquityCurve("user-123");
+
+      expect(points.length).toBe(2);
+      expect(points[0].equity).toBe(5000);
+      expect(points[1].equity).toBe(5000);
+    });
+
+    it("should query only closed trades for the requesting user", async () => {
+      (prisma.tradingAccount.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+      (prisma.botTrade.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+      await botService.getEquityCurve("user-123");
+
+      expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith({
+        where: { userId: "user-123", isActive: true },
+      });
+      expect(prisma.botTrade.findMany).toHaveBeenCalledWith({
+        where: { userId: "user-123", status: "CLOSED" },
+        orderBy: { createdAt: "asc" },
+        select: { pnl: true, createdAt: true },
       });
     });
   });

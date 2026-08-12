@@ -41,12 +41,16 @@ interface Account {
   _count: { orders: number; positions: number };
 }
 
-// ── Mock chart data ────────────────────────────────────
-const chartData = Array.from({ length: 30 }, (_, i) => ({
-  time: `${i}:00`,
-  equity: 10000 + Math.sin(i * 0.5) * 500 + i * 30 + Math.random() * 200,
-  balance: 10000 + i * 30,
-}));
+interface EquityPoint {
+  time: string;
+  equity: number;
+  pnl: number;
+}
+
+const fmtTime = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+};
 
 function StatCard({
   label,
@@ -143,6 +147,17 @@ export default function DashboardPage() {
     queryFn: () => get<Account[]>("/trading/accounts"),
   });
 
+  const { data: wallets } = useQuery({
+    queryKey: ["dashboard-wallets"],
+    queryFn: () => get<{ currency: string; balance: string }[]>("/wallets"),
+  });
+
+  const { data: equityCurve, isLoading: curveLoading } = useQuery({
+    queryKey: ["equity-curve"],
+    queryFn: () => get<EquityPoint[]>("/bots/equity-curve"),
+  });
+
+  const walletBalance = wallets?.reduce((sum, w) => sum + Number(w.balance), 0) ?? 0;
   const totalBalance = accounts?.reduce((sum, a) => sum + Number(a.balance), 0) ?? 0;
   const totalEquity = accounts?.reduce((sum, a) => sum + Number(a.equity), 0) ?? 0;
 
@@ -161,15 +176,20 @@ export default function DashboardPage() {
         {/* Stats grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label="Total Balance"
-            value={`$${totalBalance.toLocaleString()}`}
+            label="Wallet Balance"
+            value={`$${walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={Wallet}
           />
           <StatCard
-            label="Total Equity"
-            value={`$${totalEquity.toLocaleString()}`}
-            change={`+${((totalEquity - totalBalance) / totalBalance * 100).toFixed(2)}%`}
+            label="Trading Balance"
+            value={`$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={BarChart3}
+          />
+          <StatCard
+            label="Trading Equity"
+            value={`$${totalEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            change={`+${totalBalance > 0 ? ((totalEquity - totalBalance) / totalBalance * 100).toFixed(2) : "0.00"}%`}
+            icon={TrendingUp}
             positive
           />
           <StatCard
@@ -177,54 +197,73 @@ export default function DashboardPage() {
             value={accounts?.reduce((sum, a) => sum + a._count.positions, 0).toString() ?? "0"}
             icon={Activity}
           />
-          <StatCard
-            label="Today's P&L"
-            value="+$342.50"
-            change="+3.42%"
-            icon={TrendingUp}
-            positive
-          />
         </div>
 
         {/* Chart */}
         <div className="glass p-5">
-          <h3 className="text-fluid-lg font-semibold text-white mb-4">Equity Curve</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-fluid-lg font-semibold text-white">Equity Curve</h3>
+            <p className="text-fluid-xs text-broker-400">Realized P&L from your trading bots</p>
+          </div>
           <div className="h-[280px] md:h-[340px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="time" tick={{ fill: "#7485a8", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#7485a8", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#111827",
-                    border: "1px solid #243049",
-                    borderRadius: "8px",
-                    color: "#d1d8e3",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="equity"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  fill="url(#equityGradient)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="balance"
-                  stroke="#7485a8"
-                  strokeWidth={1}
-                  strokeDasharray="4 4"
-                  fill="none"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {curveLoading ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="h-4 w-40 bg-broker-600 rounded animate-pulse" />
+              </div>
+            ) : !equityCurve || equityCurve.length < 2 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center gap-2">
+                <p className="text-broker-300 text-fluid-sm">No trading history yet</p>
+                <p className="text-broker-500 text-fluid-xs max-w-xs">
+                  Activate a trading bot or place a trade to start building your equity curve.
+                </p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={equityCurve}>
+                  <defs>
+                    <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fill: "#7485a8", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: any) => fmtTime(String(v))}
+                    minTickGap={40}
+                  />
+                  <YAxis
+                    tick={{ fill: "#7485a8", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    domain={["auto", "auto"]}
+                    tickFormatter={(v: any) => `$${Number(v).toLocaleString()}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#111827",
+                      border: "1px solid #243049",
+                      borderRadius: "8px",
+                      color: "#d1d8e3",
+                    }}
+                    labelFormatter={(label) => new Date(label as string).toLocaleString()}
+                    formatter={(value: any) => [
+                      `$${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                      "Equity",
+                    ]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="equity"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fill="url(#equityGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 

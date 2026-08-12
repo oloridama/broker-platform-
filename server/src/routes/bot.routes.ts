@@ -14,6 +14,7 @@ router.post("/", asyncHandler(ctrl.create));
 router.post("/:id/toggle", asyncHandler(ctrl.toggle));
 router.post("/:id/simulate", asyncHandler(ctrl.simulate));
 router.get("/:id/trades", asyncHandler(ctrl.getTrades));
+router.get("/equity-curve", asyncHandler(ctrl.getEquityCurve));
 router.delete("/:id", asyncHandler(ctrl.remove));
 
 export default router;

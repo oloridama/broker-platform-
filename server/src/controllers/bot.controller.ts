@@ -30,6 +30,11 @@ export async function getTrades(req: Request, res: Response) {
   res.json(success(trades));
 }
 
+export async function getEquityCurve(req: Request, res: Response) {
+  const curve = await botService.getEquityCurve(req.user!.sub);
+  res.json(success(curve));
+}
+
 export async function toggle(req: Request, res: Response) {
   const { action } = req.body;
   const bot = await botService.toggleBot(req.params.id, req.user!.sub, action);
