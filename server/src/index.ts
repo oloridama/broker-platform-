@@ -4,6 +4,7 @@ import prisma from "./db";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { startBotScheduler } from "./botScheduler";
+import { fetchAllMarketPrices } from "./services/market.service";
 
 async function main() {
   try {
@@ -19,33 +20,35 @@ async function main() {
   const wss = new WebSocketServer({ server, path: "/ws" });
   const clients = new Set<WebSocket>();
 
-  // Simulate live prices for connected clients
-  const basePrices: Record<string, number> = {
-    "BTC/USD": 63250, "ETH/USD": 3125, "EUR/USD": 1.0856,
-    "GBP/USD": 1.2645, "XAU/USD": 2350.80, "AAPL": 195.50,
-    "NVDA": 190.01, "TSLA": 298.32,
-  };
-
-  setInterval(() => {
+  // Broadcast REAL market prices (Binance crypto + Yahoo forex/gold/stocks)
+  // every 15s so the floating ticker matches the markets page / API prices.
+  async function broadcastPrices() {
     if (clients.size === 0) return;
-    const updates: Record<string, { price: number; change: number }> = {};
-    for (const [symbol, price] of Object.entries(basePrices)) {
-      const jitter = (Math.random() - 0.5) * 0.002;
-      const newPrice = price * (1 + jitter);
-      basePrices[symbol] = newPrice;
-      updates[symbol] = { price: newPrice, change: jitter * 100 };
+    try {
+      const prices = await fetchAllMarketPrices();
+      if (!prices.length) return;
+      const data: Record<string, { price: number; change: number }> = {};
+      for (const p of prices) data[p.symbol] = { price: p.price, change: p.change };
+      const msg = JSON.stringify({ type: "price_update", data, ts: Date.now() });
+      for (const ws of clients) {
+        if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+      }
+    } catch (err) {
+      console.warn("[ws] price broadcast error:", (err as Error).message);
     }
-    const msg = JSON.stringify({ type: "price_update", data: updates, ts: Date.now() });
-    for (const ws of clients) {
-      if (ws.readyState === WebSocket.OPEN) ws.send(msg);
-    }
-  }, 2000);
+  }
 
+  // Push a snapshot on connect, then every 15s
   wss.on("connection", (ws) => {
     clients.add(ws);
     ws.send(JSON.stringify({ type: "connected", message: "Live prices active" }));
+    broadcastPrices().catch(() => {});
     ws.on("close", () => clients.delete(ws));
   });
+
+  setInterval(() => {
+    broadcastPrices().catch(() => {});
+  }, 15_000);
 
   server.listen(config.port, () => {
     console.log(`\n🚀 Server running on http://localhost:${config.port}`);
