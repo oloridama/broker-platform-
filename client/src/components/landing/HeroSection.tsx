@@ -5,6 +5,16 @@ import { useLivePrices } from "@/hooks/useLivePrices";
 
 const ROTATING_WORDS = ["Stocks", "Forex", "Crypto", "Bonds", "ETFs", "Commodities"];
 
+// Safe formatters — never crash the page on a transient missing price
+function fmtPrice(v: number | undefined, digits = 2) {
+  return typeof v === "number" && Number.isFinite(v)
+    ? v.toLocaleString(undefined, { maximumFractionDigits: digits })
+    : null;
+}
+function fmtChange(v: number | undefined) {
+  return typeof v === "number" && Number.isFinite(v) ? v.toFixed(2) : null;
+}
+
 export function HeroSection() {
   const prices = useLivePrices(10000);
   const btc = prices.find((p) => p.symbol === "BTC/USD");
@@ -96,27 +106,27 @@ export function HeroSection() {
                 <div className="flex justify-between">
                   <span className="text-broker-500">BTC/USDT</span>
                   <span className="text-white">
-                    ${btc ? btc.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
+                    {btc ? fmtPrice(btc.price) ?? "—" : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className={btc && btc.changePercent >= 0 ? "text-accent" : "text-broker-500"}>
-                    {btc && btc.changePercent >= 0 ? "▲" : "▼"} 24h Change
+                  <span className={btc && (btc.changePercent ?? -1) >= 0 ? "text-accent" : "text-broker-500"}>
+                    {btc && (btc.changePercent ?? -1) >= 0 ? "▲" : "▼"} 24h Change
                   </span>
-                  <span className={btc && btc.changePercent >= 0 ? "text-profit" : "text-loss"}>
-                    {btc ? `${btc.changePercent >= 0 ? "+" : ""}${btc.changePercent.toFixed(2)}%` : "—"}
+                  <span className={btc && (btc.changePercent ?? -1) >= 0 ? "text-profit" : "text-loss"}>
+                    {btc ? (fmtChange(btc.changePercent) === null ? "—" : `${(btc.changePercent ?? 0) >= 0 ? "+" : ""}${fmtChange(btc.changePercent)}%`) : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-broker-500">ETH/USDT</span>
                   <span className="text-white">
-                    ${eth ? eth.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
+                    {eth ? fmtPrice(eth.price) ?? "—" : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-broker-500">EUR/USD</span>
                   <span className="text-white">
-                    {eur ? eur.price.toFixed(5) : "—"}
+                    {eur ? fmtPrice(eur.price, 5) ?? "—" : "—"}
                   </span>
                 </div>
               </div>

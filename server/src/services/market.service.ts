@@ -33,6 +33,7 @@ export interface MarketPrice {
   symbol: string;
   price: number;
   change: number; // change percent
+  changePercent: number; // alias of change, for client compatibility
   updatedAt: string;
 }
 
@@ -111,10 +112,12 @@ export async function fetchAllMarketPrices(): Promise<MarketPrice[]> {
     const yah = s.yahoo ? yahoo.get(s.symbol) : undefined;
     const src = bin || yah;
     if (src) {
+      const change = Number(src.change.toFixed(2));
       out.push({
         symbol: s.symbol,
         price: src.price,
-        change: Number(src.change.toFixed(2)),
+        change,
+        changePercent: change,
         updatedAt: new Date().toISOString(),
       });
     }

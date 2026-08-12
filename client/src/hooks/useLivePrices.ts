@@ -47,7 +47,8 @@ function seedFor(s: (typeof SYMBOLS)[number]): TickerPrice {
 interface MarketPrice {
   symbol: string;
   price: number;
-  changePercent: number;
+  change?: number;
+  changePercent?: number;
 }
 
 async function fetchMarketPrices(): Promise<Map<string, MarketPrice>> {
@@ -114,11 +115,17 @@ export function useLivePrices(refetchMs = 15000) {
           }
           const marketItem = market.get(p.symbol);
           if (marketItem) {
+            const changePercent =
+              typeof marketItem.changePercent === "number"
+                ? marketItem.changePercent
+                : typeof marketItem.change === "number"
+                  ? marketItem.change
+                  : p.changePercent;
             return {
               ...p,
-              price: marketItem.price,
-              change: marketItem.changePercent,
-              changePercent: marketItem.changePercent,
+              price: typeof marketItem.price === "number" ? marketItem.price : p.price,
+              change: changePercent,
+              changePercent,
             };
           }
           return p;
