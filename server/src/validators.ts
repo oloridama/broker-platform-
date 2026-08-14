@@ -84,8 +84,12 @@ export const updateProfileSchema = z.object({
   lastName: nameField.optional(),
 });
 
-export const changePasswordSchema = z.object({
+export const requestPasswordChangeSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
+});
+
+export const confirmPasswordChangeSchema = z.object({
+  code: z.string().regex(/^\d{6}$/, "Verification code must be 6 digits"),
   newPassword: z
     .string()
     .min(8, "Password must be at least 8 characters")

@@ -59,12 +59,13 @@ export default function ProfilePage() {
     postalCode: "",
     country: "",
   });
-  const [showPw, setShowPw] = useState(false);
+  const [pwStep, setPwStep] = useState<"idle" | "form" | "verify">("idle");
   const [pwForm, setPwForm] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
+  const [pwCode, setPwCode] = useState("");
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile"],
@@ -99,16 +100,25 @@ export default function ProfilePage() {
     },
   });
 
-  const changePwMutation = useMutation({
-    mutationFn: () =>
-      post("/users/me/change-password", {
-        currentPassword: pwForm.currentPassword,
-        newPassword: pwForm.newPassword,
-      }),
+  const requestPwMutation = useMutation({
+    mutationFn: () => post("/users/me/change-password/request", { currentPassword: pwForm.currentPassword }),
+    onSuccess: () => {
+      toast.success("Verification code sent to your email");
+      setPwStep("verify");
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed to send verification code";
+      toast.error(msg);
+    },
+  });
+
+  const confirmPwMutation = useMutation({
+    mutationFn: () => post("/users/me/change-password/confirm", { code: pwCode, newPassword: pwForm.newPassword }),
     onSuccess: () => {
       toast.success("Password updated!");
       setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      setShowPw(false);
+      setPwCode("");
+      setPwStep("idle");
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed to change password";
@@ -116,7 +126,7 @@ export default function ProfilePage() {
     },
   });
 
-  function submitPassword() {
+  function submitPasswordRequest() {
     if (pwForm.newPassword.length < 8 || !/[A-Z]/.test(pwForm.newPassword) || !/[0-9]/.test(pwForm.newPassword)) {
       toast.error("New password must be 8+ characters with an uppercase letter and a number");
       return;
@@ -125,7 +135,7 @@ export default function ProfilePage() {
       toast.error("New passwords do not match");
       return;
     }
-    changePwMutation.mutate();
+    requestPwMutation.mutate();
   }
 
   const kycStatusIcon = (status: string) => {
@@ -220,7 +230,35 @@ export default function ProfilePage() {
             <Lock className="w-5 h-5 text-accent" /> Security
           </h3>
 
-          {showPw ? (
+          {pwStep === "verify" ? (
+            <div className="space-y-4">
+              <p className="text-fluid-sm text-broker-300">
+                Enter the 6-digit code we emailed to <span className="text-white font-medium">{profile?.email}</span>. It expires in 10 minutes.
+              </p>
+              <div className="max-w-xs">
+                <label className="label">Verification Code</label>
+                <input
+                  value={pwCode}
+                  onChange={(e) => setPwCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className="input text-center text-lg tracking-[0.5em] font-mono"
+                  placeholder="••••••"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => confirmPwMutation.mutate()}
+                  disabled={confirmPwMutation.isPending || pwCode.length !== 6}
+                  className="btn-primary gap-2"
+                >
+                  {confirmPwMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                  Verify & Change Password
+                </button>
+                <button onClick={() => { setPwStep("form"); setPwCode(""); }} className="btn-secondary">Back</button>
+              </div>
+            </div>
+          ) : pwStep === "form" ? (
             <div className="space-y-4">
               <div>
                 <label className="label">Current Password</label>
@@ -257,23 +295,26 @@ export default function ProfilePage() {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={submitPassword}
-                  disabled={changePwMutation.isPending}
+                  onClick={submitPasswordRequest}
+                  disabled={requestPwMutation.isPending}
                   className="btn-primary gap-2"
                 >
-                  {changePwMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-                  Update Password
+                  {requestPwMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                  Send Verification Code
                 </button>
-                <button onClick={() => setShowPw(false)} className="btn-secondary">Cancel</button>
+                <button onClick={() => setPwStep("idle")} className="btn-secondary">Cancel</button>
               </div>
+              <p className="text-fluid-xs text-broker-500">
+                A 6-digit verification code will be emailed to your registered address before the change is applied.
+              </p>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <p className="text-fluid-sm text-broker-300">Keep your account secure</p>
-                <p className="text-fluid-xs text-broker-500 mt-0.5">Change the password you use to sign in.</p>
+                <p className="text-fluid-xs text-broker-500 mt-0.5">Change the password you use to sign in. A verification code is sent to your email.</p>
               </div>
-              <button onClick={() => setShowPw(true)} className="btn-secondary">Change Password</button>
+              <button onClick={() => setPwStep("form")} className="btn-secondary">Change Password</button>
             </div>
           )}
         </div>

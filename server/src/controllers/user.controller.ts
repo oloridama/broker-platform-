@@ -12,9 +12,13 @@ export async function updateProfile(req: Request, res: Response) {
   res.json(success(updated));
 }
 
-export async function changePassword(req: Request, res: Response) {
-  const { currentPassword, newPassword } = req.body;
-  const result = await userService.changePassword(req.user!.sub, currentPassword, newPassword);
+export async function requestPasswordChange(req: Request, res: Response) {
+  const result = await userService.requestPasswordChange(req.user!.sub, req.body.currentPassword);
+  res.json(success(result));
+}
+
+export async function confirmPasswordChange(req: Request, res: Response) {
+  const result = await userService.confirmPasswordChange(req.user!.sub, req.body.code, req.body.newPassword);
   res.json(success(result));
 }
 

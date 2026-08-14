@@ -15,6 +15,17 @@ function requireEnv(key: string, devFallback: string): string {
 export const config = {
   env: process.env.NODE_ENV || "development",
   port: parseInt(process.env.SERVER_PORT || "4000", 10),
+  appUrl: process.env.APP_URL || "http://localhost:5173",
+
+  mail: {
+    host: process.env.SMTP_HOST || "",
+    port: parseInt(process.env.SMTP_PORT || "587", 10),
+    secure: (process.env.SMTP_SECURE || "false") === "true",
+    user: process.env.SMTP_USER || "",
+    pass: process.env.SMTP_PASS || "",
+    from: process.env.MAIL_FROM || "no-reply@fxatrade.live",
+  },
+
 
   jwt: {
     accessSecret: requireEnv("JWT_ACCESS_SECRET", "dev-access-secret-change-me"),

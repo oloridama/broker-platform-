@@ -3,6 +3,7 @@ import { v4 as uuid } from "uuid";
 import prisma from "../db";
 import { config } from "../config";
 import { AppError } from "../utils/response";
+import { sendMail } from "./mailer";
 import {
   signAccessToken,
   storeRefreshToken,
@@ -203,8 +204,12 @@ export async function requestPasswordReset(email: string) {
   const token = uuid();
   resetTokens.set(token, { userId: user.id, expiresAt: new Date(Date.now() + 3600000) }); // 1 hour
 
-  // In production, send email. For dev, log to console.
-  console.log(`🔑 Password reset token for ${email}: ${token}`);
+  const link = `${config.appUrl}/reset-password?token=${token}`;
+  await sendMail({
+    to: user.email,
+    subject: "Reset your FXA Trade password",
+    text: `We received a request to reset your FXA Trade password.\n\nOpen the link below to choose a new password (valid for 1 hour):\n${link}\n\nIf you did not request this, you can safely ignore this email.`,
+  });
   return { message: "If the email exists, a reset link has been sent." };
 }
 
@@ -233,7 +238,13 @@ const verificationTokens = new Map<string, { userId: string; expiresAt: Date }>(
 export async function sendVerificationEmail(userId: string, email: string) {
   const token = uuid();
   verificationTokens.set(token, { userId, expiresAt: new Date(Date.now() + 86400000) }); // 24 hours
-  console.log(`📧 Verification token for ${email}: ${token}`);
+
+  const link = `${config.appUrl}/verify-email?token=${token}`;
+  await sendMail({
+    to: email,
+    subject: "Verify your FXA Trade email address",
+    text: `Welcome to FXA Trade! Confirm your email address by opening the link below (valid for 24 hours):\n${link}`,
+  });
   return token;
 }
 
