@@ -12,6 +12,12 @@ export async function updateProfile(req: Request, res: Response) {
   res.json(success(updated));
 }
 
+export async function changePassword(req: Request, res: Response) {
+  const { currentPassword, newPassword } = req.body;
+  const result = await userService.changePassword(req.user!.sub, currentPassword, newPassword);
+  res.json(success(result));
+}
+
 export async function submitKyc(req: Request, res: Response) {
   const kyc = await userService.submitKyc(req.user!.sub, req.body);
   res.status(201).json(success(kyc));

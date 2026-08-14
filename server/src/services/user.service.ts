@@ -1,4 +1,6 @@
+import bcrypt from "bcrypt";
 import prisma from "../db";
+import { config } from "../config";
 import { AppError } from "../utils/response";
 
 export async function getUserProfile(userId: string) {
@@ -30,6 +32,19 @@ export async function updateProfile(userId: string, data: { firstName?: string; 
     data,
     select: { id: true, email: true, firstName: true, lastName: true, role: true },
   });
+}
+
+export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError("User not found", 404);
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) throw new AppError("Current password is incorrect", 400);
+
+  const passwordHash = await bcrypt.hash(newPassword, config.bcrypt.saltRounds);
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+
+  return { message: "Password updated successfully" };
 }
 
 export async function submitKyc(userId: string, data: {

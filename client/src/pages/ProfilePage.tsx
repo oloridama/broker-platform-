@@ -12,6 +12,7 @@ import {
   Save,
   Upload,
   Loader2,
+  Lock,
   CheckCircle,
   Clock,
   XCircle,
@@ -58,6 +59,12 @@ export default function ProfilePage() {
     postalCode: "",
     country: "",
   });
+  const [showPw, setShowPw] = useState(false);
+  const [pwForm, setPwForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile"],
@@ -91,6 +98,35 @@ export default function ProfilePage() {
       toast.error(msg);
     },
   });
+
+  const changePwMutation = useMutation({
+    mutationFn: () =>
+      post("/users/me/change-password", {
+        currentPassword: pwForm.currentPassword,
+        newPassword: pwForm.newPassword,
+      }),
+    onSuccess: () => {
+      toast.success("Password updated!");
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setShowPw(false);
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed to change password";
+      toast.error(msg);
+    },
+  });
+
+  function submitPassword() {
+    if (pwForm.newPassword.length < 8 || !/[A-Z]/.test(pwForm.newPassword) || !/[0-9]/.test(pwForm.newPassword)) {
+      toast.error("New password must be 8+ characters with an uppercase letter and a number");
+      return;
+    }
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+    changePwMutation.mutate();
+  }
 
   const kycStatusIcon = (status: string) => {
     switch (status) {
@@ -174,6 +210,70 @@ export default function ProfilePage() {
           ) : (
             <div className="flex gap-2">
               <button onClick={() => setEditing(true)} className="btn-secondary">Edit Profile</button>
+            </div>
+          )}
+        </div>
+
+        {/* Security: Change Password */}
+        <div className="glass p-5 md:p-6">
+          <h3 className="text-fluid-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Lock className="w-5 h-5 text-accent" /> Security
+          </h3>
+
+          {showPw ? (
+            <div className="space-y-4">
+              <div>
+                <label className="label">Current Password</label>
+                <input
+                  type="password"
+                  value={pwForm.currentPassword}
+                  onChange={(e) => setPwForm((f) => ({ ...f, currentPassword: e.target.value }))}
+                  className="input"
+                  autoComplete="current-password"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">New Password</label>
+                  <input
+                    type="password"
+                    value={pwForm.newPassword}
+                    onChange={(e) => setPwForm((f) => ({ ...f, newPassword: e.target.value }))}
+                    className="input"
+                    autoComplete="new-password"
+                    placeholder="8+ chars, uppercase, number"
+                  />
+                </div>
+                <div>
+                  <label className="label">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={pwForm.confirmPassword}
+                    onChange={(e) => setPwForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                    className="input"
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={submitPassword}
+                  disabled={changePwMutation.isPending}
+                  className="btn-primary gap-2"
+                >
+                  {changePwMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                  Update Password
+                </button>
+                <button onClick={() => setShowPw(false)} className="btn-secondary">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-fluid-sm text-broker-300">Keep your account secure</p>
+                <p className="text-fluid-xs text-broker-500 mt-0.5">Change the password you use to sign in.</p>
+              </div>
+              <button onClick={() => setShowPw(true)} className="btn-secondary">Change Password</button>
             </div>
           )}
         </div>
