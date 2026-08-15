@@ -27,13 +27,13 @@ export interface MailOptions {
   html?: string;
 }
 
-export async function sendMail(opts: MailOptions): Promise<void> {
+export async function sendMail(opts: MailOptions): Promise<boolean> {
   const from = config.mail.from || "no-reply@fxatrade.live";
 
   if (!transporter) {
     // Dev/test fallback — no SMTP configured, just log.
     console.log(`📧 [dev mail] To: ${opts.to} | Subject: ${opts.subject}\n${opts.text}\n`);
-    return;
+    return false;
   }
 
   try {
@@ -44,9 +44,10 @@ export async function sendMail(opts: MailOptions): Promise<void> {
       text: opts.text,
       html: opts.html || undefined,
     });
+    return true;
   } catch (err) {
     console.error("[mailer] send failed:", (err as Error).message);
-    throw err;
+    return false;
   }
 }
 

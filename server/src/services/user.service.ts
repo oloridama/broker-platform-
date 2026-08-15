@@ -38,7 +38,19 @@ export async function updateProfile(userId: string, data: { firstName?: string; 
 // ── Change password (email verification code) ──────────
 // Professional flow: user proves the current password, we email a 6-digit
 // code to their registered address, and only a valid code applies the change.
-const passwordChangeCodes = new Map<string, { codeHash: string; expiresAt: Date; attempts: number }>();
+// If email delivery is unavailable, the code is exposed to admins so they can
+// relay it to the user manually (see listPasswordChangeCodes).
+interface PasswordChangeEntry {
+  userId: string;
+  email: string;
+  code: string; // plaintext — admin-visible for manual relay
+  codeHash: string; // used to verify the code the user enters
+  expiresAt: Date;
+  attempts: number;
+  emailed: boolean; // true if delivered via SMTP
+}
+
+const passwordChangeCodes = new Map<string, PasswordChangeEntry>();
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const CODE_MAX_ATTEMPTS = 5;
 
@@ -55,15 +67,48 @@ export async function requestPasswordChange(userId: string, currentPassword: str
 
   const code = generateCode();
   const codeHash = await bcrypt.hash(code, 8);
-  passwordChangeCodes.set(userId, { codeHash, expiresAt: new Date(Date.now() + CODE_TTL_MS), attempts: 0 });
 
-  await sendMail({
+  // Try to deliver via email; on failure/absence of SMTP the code stays
+  // available to admins for manual relay.
+  const emailed = await sendMail({
     to: user.email,
     subject: "Your FXA Trade password change verification code",
     text: `Your FXA Trade verification code is ${code}.\n\nIt expires in 10 minutes. Enter it to confirm the password change.\n\nIf you did not request this, contact support immediately — someone may be trying to access your account.`,
   });
 
-  return { message: "Verification code sent to your email" };
+  passwordChangeCodes.set(userId, {
+    userId,
+    email: user.email,
+    code,
+    codeHash,
+    expiresAt: new Date(Date.now() + CODE_TTL_MS),
+    attempts: 0,
+    emailed,
+  });
+
+  return {
+    message: emailed ? "Verification code sent to your email" : "A verification code was generated — request it from support to proceed",
+    delivered: (emailed ? "email" : "manual") as "email" | "manual",
+  };
+}
+
+/** Admin-only: list pending password-change codes (for manual relay). */
+export function listPasswordChangeCodes() {
+  const now = Date.now();
+  const out: { id: string; email: string; code: string; expiresAt: Date; emailed: boolean; attempts: number }[] = [];
+  for (const entry of passwordChangeCodes.values()) {
+    if (entry.expiresAt.getTime() > now) {
+      out.push({
+        id: entry.userId,
+        email: entry.email,
+        code: entry.code,
+        expiresAt: entry.expiresAt,
+        emailed: entry.emailed,
+        attempts: entry.attempts,
+      });
+    }
+  }
+  return out;
 }
 
 export async function confirmPasswordChange(userId: string, code: string, newPassword: string) {

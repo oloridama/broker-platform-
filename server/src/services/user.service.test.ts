@@ -31,7 +31,7 @@ describe("User Service — change password (email OTP)", () => {
     vi.resetAllMocks();
     (bcrypt.compare as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (bcrypt.hash as ReturnType<typeof vi.fn>).mockResolvedValue("hashed");
-    (sendMail as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (sendMail as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
   });
 
   describe("requestPasswordChange", () => {
@@ -49,6 +49,7 @@ describe("User Service — change password (email OTP)", () => {
       const res = await userService.requestPasswordChange("u1", "Admin123!");
 
       expect(res.message).toContain("Verification code sent");
+      expect(res.delivered).toBe("email");
       expect(sendMail).toHaveBeenCalledTimes(1);
       const opts = (sendMail as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(opts.to).toBe("a@b.com");

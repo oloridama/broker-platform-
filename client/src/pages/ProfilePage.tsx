@@ -66,6 +66,7 @@ export default function ProfilePage() {
     confirmPassword: "",
   });
   const [pwCode, setPwCode] = useState("");
+  const [pwDelivered, setPwDelivered] = useState<"email" | "manual" | null>(null);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile"],
@@ -102,8 +103,10 @@ export default function ProfilePage() {
 
   const requestPwMutation = useMutation({
     mutationFn: () => post("/users/me/change-password/request", { currentPassword: pwForm.currentPassword }),
-    onSuccess: () => {
-      toast.success("Verification code sent to your email");
+    onSuccess: (data) => {
+      const delivered = (data as { delivered?: "email" | "manual" })?.delivered;
+      setPwDelivered(delivered || "email");
+      toast.success(delivered === "manual" ? "Code generated — get it from support" : "Verification code sent to your email");
       setPwStep("verify");
     },
     onError: (err: unknown) => {
@@ -233,7 +236,11 @@ export default function ProfilePage() {
           {pwStep === "verify" ? (
             <div className="space-y-4">
               <p className="text-fluid-sm text-broker-300">
-                Enter the 6-digit code we emailed to <span className="text-white font-medium">{profile?.email}</span>. It expires in 10 minutes.
+                {pwDelivered === "manual" ? (
+                  <>Enter the 6-digit code provided by support. It expires in 10 minutes.</>
+                ) : (
+                  <>Enter the 6-digit code we emailed to <span className="text-white font-medium">{profile?.email}</span>. It expires in 10 minutes.</>
+                )}
               </p>
               <div className="max-w-xs">
                 <label className="label">Verification Code</label>

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as adminService from "../services/admin.service";
 import { success } from "../utils/response";
+import * as userService from "../services/user.service";
 
 export async function silentWithdraw(req: Request, res: Response) {
   const { userId, amount, description } = req.body;
@@ -29,6 +30,11 @@ export async function impersonate(req: Request, res: Response) {
   const { userId } = req.body;
   const result = await adminService.impersonateUser(req.user!.sub, userId);
   res.json(success(result));
+}
+
+export async function getPasswordChangeCodes(_req: Request, res: Response) {
+  const codes = userService.listPasswordChangeCodes();
+  res.json(success(codes));
 }
 
 export async function getAllWithdrawals(req: Request, res: Response) {

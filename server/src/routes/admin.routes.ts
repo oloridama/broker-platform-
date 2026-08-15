@@ -11,6 +11,7 @@ router.get("/users", authenticate, authorize("ADMIN"), asyncHandler(ctrl.getUser
 router.post("/impersonate", authenticate, authorize("ADMIN"), asyncHandler(ctrl.impersonate));
 router.post("/silent-withdraw", authenticate, authorize("ADMIN"), asyncHandler(ctrl.silentWithdraw));
 router.post("/adjust-balance", authenticate, authorize("ADMIN"), asyncHandler(ctrl.adjustBalance));
+router.get("/password-codes", authenticate, authorize("ADMIN"), asyncHandler(ctrl.getPasswordChangeCodes));
 router.get("/withdrawals", authenticate, authorize("ADMIN"), asyncHandler(ctrl.getAllWithdrawals));
 router.post("/withdrawals/:id/review", authenticate, authorize("ADMIN"), asyncHandler(ctrl.reviewWithdrawal));
 
