@@ -18,6 +18,7 @@ import botRoutes from "./routes/bot.routes";
 import adminRoutes from "./routes/admin.routes";
 import depositRoutes from "./routes/deposit.routes";
 import marketRoutes from "./routes/market.routes";
+import webhookRoutes from "./routes/webhook.routes";
 
 // ── Initialise Express ──────────────────────────────────
 const app = express();
@@ -106,6 +107,7 @@ app.use("/api/bots", botRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/deposits", depositRoutes);
 app.use("/api/markets", marketRoutes);
+app.use("/api/webhooks", webhookRoutes);
 
 // ── Production: serve built client + SPA fallback ─────
 // In production, Express serves the compiled React app (client/dist) so a

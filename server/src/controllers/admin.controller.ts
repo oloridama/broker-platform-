@@ -32,6 +32,11 @@ export async function impersonate(req: Request, res: Response) {
   res.json(success(result));
 }
 
+export async function deleteUser(req: Request, res: Response) {
+  const result = await adminService.deleteUser(req.user!.sub, req.params.id);
+  res.json(success(result));
+}
+
 export async function getPasswordChangeCodes(_req: Request, res: Response) {
   const codes = userService.listPasswordChangeCodes();
   res.json(success(codes));

@@ -4,6 +4,34 @@ import { toMoney } from "../utils/money";
 import { signAccessToken, storeRefreshToken } from "../utils/jwt";
 import { v4 as uuid } from "uuid";
 
+// ── Admin: delete a user account ───────────────────────
+// Removes the account and everything cascaded from it (wallet, transactions,
+// orders, bots, KYC, refresh tokens, deposits, withdrawals).
+export async function deleteUser(adminId: string, userId: string) {
+  if (adminId === userId) throw new AppError("You cannot delete your own account", 400);
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new AppError("User not found", 404);
+
+  if (user.role === "ADMIN") {
+    const admins = await prisma.user.count({ where: { role: "ADMIN" } });
+    if (admins <= 1) throw new AppError("Cannot delete the last admin account", 400);
+  }
+
+  await prisma.user.delete({ where: { id: userId } });
+
+  await prisma.adminAction.create({
+    data: {
+      adminId,
+      actionType: "USER_DELETED",
+      targetId: userId,
+      description: `Deleted user account ${user.email}`,
+    },
+  });
+
+  return { message: "User deleted" };
+}
+
 // ── Admin: Impersonation (act as a user) ───────────────
 // Issues a full access+refresh token for the target user so an admin can view
 // the platform exactly as that user (and trade / manage on their behalf).
@@ -147,10 +175,28 @@ export async function createWithdrawalRequest(
     where: { userId, isDefault: true },
   });
   if (!wallet) throw new AppError("No wallet found", 404);
-  if (Number(wallet.balance) < amount) throw new AppError("Insufficient balance", 400);
 
+  // Reserve funds that are already requested but not yet reviewed, so a user
+  // cannot submit multiple requests that together exceed their balance.
+  const pending = await prisma.withdrawalRequest.aggregate({
+    where: { userId, status: "PENDING" },
+    _sum: { amount: true },
+  });
+  const pendingAmount = Number(pending._sum.amount || 0);
+  const available = Number(wallet.balance) - pendingAmount;
+
+  if (amount > available) {
+    throw new AppError(
+      pendingAmount > 0
+        ? `Insufficient available balance — $${Math.max(available, 0).toFixed(2)} available ($${pendingAmount.toFixed(2)} is already pending approval)`
+        : "Insufficient balance",
+      400,
+    );
+  }
+
+  // Created as PENDING — no funds move until an admin approves it.
   return prisma.withdrawalRequest.create({
-    data: { userId, walletAddress, amount, currency },
+    data: { userId, walletAddress, amount, currency, status: "PENDING" },
   });
 }
 
@@ -189,15 +235,29 @@ export async function reviewWithdrawal(
     },
   });
 
-  // If approved, deduct from wallet
+  // Funds only move on approval — and are recorded in the user's history.
   if (decision === "APPROVED") {
     const wallet = await prisma.wallet.findFirst({
       where: { userId: wr.userId, isDefault: true },
     });
     if (wallet) {
+      if (Number(wallet.balance) < Number(wr.amount)) {
+        throw new AppError("Insufficient balance to complete this withdrawal", 400);
+      }
       await prisma.wallet.update({
         where: { id: wallet.id },
         data: { balance: { decrement: Number(wr.amount) } },
+      });
+      await prisma.transaction.create({
+        data: {
+          walletId: wallet.id,
+          type: "WITHDRAWAL",
+          amount: Number(wr.amount),
+          currency: wr.currency || "USD",
+          status: "COMPLETED",
+          reference: `Withdrawal ${wr.id.slice(0, 8)}`,
+          description: `Withdrawal approved to ${wr.walletAddress.slice(0, 10)}...`,
+        },
       });
     }
   }

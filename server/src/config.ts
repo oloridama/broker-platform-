@@ -26,6 +26,11 @@ export const config = {
     from: process.env.MAIL_FROM || "no-reply@fxatrade.live",
   },
 
+  webhook: {
+    // Shared secret used by the standalone bot engine (server-to-server).
+    botProfitToken: process.env.WEBHOOK_BOT_PROFIT_TOKEN || "dev-webhook-token-change-me",
+  },
+
 
   jwt: {
     accessSecret: requireEnv("JWT_ACCESS_SECRET", "dev-access-secret-change-me"),

@@ -10,6 +10,7 @@ import {
   Loader2,
   Plus,
   History,
+  Clock,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────
@@ -135,7 +136,7 @@ export default function WalletPage() {
 
   const { data: withdrawalRequests } = useQuery({
     queryKey: ["withdrawals"],
-    queryFn: () => get<{ id: string; walletAddress: string; amount: string; status: string; createdAt: string }[]>("/admin/withdrawals"),
+    queryFn: () => get<{ id: string; walletAddress: string; amount: string; status: string; createdAt: string }[]>("/admin/withdrawals/mine"),
   });
 
   const handleCreateDeposit = () => {
@@ -168,6 +169,10 @@ export default function WalletPage() {
             <button onClick={() => setShowTxHistory(!showTxHistory)} className="btn-secondary gap-2">
               <History className="w-4 h-4" />
               <span className="hidden sm:inline">Transactions</span>
+            </button>
+            <button onClick={() => setShowWithdraw(true)} className="btn-secondary gap-2">
+              <ArrowUpFromLine className="w-4 h-4" />
+              <span className="hidden sm:inline">Withdraw</span>
             </button>
             <button onClick={openDeposit} className="btn-primary gap-2">
               <Plus className="w-4 h-4" />
@@ -446,6 +451,19 @@ export default function WalletPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Pending withdrawal notice — funds reserved until admin approval */}
+        {withdrawalRequests && withdrawalRequests.some((w) => w.status === "PENDING") && (
+          <div className="glass p-4 border-l-2 border-amber-400/70 flex items-start gap-3 animate-fade-in">
+            <Clock className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-fluid-sm text-white font-medium">Withdrawal pending admin approval</p>
+              <p className="text-fluid-xs text-broker-400 mt-0.5">
+                {withdrawalRequests.filter((w) => w.status === "PENDING").length} request(s) awaiting review. The amount is reserved and will only be deducted from your balance once approved.
+              </p>
             </div>
           </div>
         )}

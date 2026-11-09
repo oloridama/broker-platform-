@@ -301,3 +301,14 @@ model PendingDeposit {
   @@index([userId])
   @@index([status])
 }
+
+// Idempotent delivery records from the standalone bot engine (M1).
+model WebhookDelivery {
+  id             String   @id @default(uuid())
+  idempotencyKey String   @unique
+  event          String
+  payload        String   @default("{}")
+  status         String   @default("PROCESSED") // PROCESSED | FAILED
+  createdAt      DateTime @default(now())
+  processedAt    DateTime @default(now())
+}

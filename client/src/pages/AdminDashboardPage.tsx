@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { get, post, patch } from "@/lib/api";
+import { get, post, patch, del } from "@/lib/api";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import toast from "react-hot-toast";
 import { useState } from "react";
@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore, type User } from "@/store/authStore";
 import {
   Users, Wallet, ArrowUpFromLine, Check, X, Clock, Loader2, Search,
-  Shield, DollarSign, EyeOff, Eye, UserCog, Copy, KeyRound,
+  Shield, DollarSign, EyeOff, Eye, UserCog, Copy, KeyRound, Trash2,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────
@@ -138,6 +138,17 @@ export default function AdminDashboardPage() {
       toast.success("Withdrawal reviewed");
     },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed"),
+  });
+
+  // ── Delete a user account ───────────────────────────
+  const deleteUserMut = useMutation({
+    mutationFn: (userId: string) => del(`/admin/users/${userId}`),
+    onSuccess: () => {
+      toast.success("User deleted");
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed to delete user"),
   });
 
   // ── Impersonation (act as a user) ────────────────────
@@ -643,15 +654,30 @@ export default function AdminDashboardPage() {
                       </td>
                       <td className="text-right px-4 py-3">
                         {u.role !== "ADMIN" && (
-                          <button
-                            onClick={() => impersonateMut.mutate(u.id)}
-                            disabled={impersonateMut.isPending}
-                            className="btn-secondary text-[10px] py-1 px-2 gap-1 text-accent"
-                            title="Act as this user (view & trade on their behalf)"
-                          >
-                            {impersonateMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserCog className="w-3 h-3" />}
-                            Act as
-                          </button>
+                          <div className="flex gap-1.5 justify-end">
+                            <button
+                              onClick={() => impersonateMut.mutate(u.id)}
+                              disabled={impersonateMut.isPending}
+                              className="btn-secondary text-[10px] py-1 px-2 gap-1 text-accent"
+                              title="Act as this user (view & trade on their behalf)"
+                            >
+                              {impersonateMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserCog className="w-3 h-3" />}
+                              Act as
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete ${u.email}?\n\nThis permanently removes the account and all its data (wallet, transactions, orders, bots). This cannot be undone.`)) {
+                                  deleteUserMut.mutate(u.id);
+                                }
+                              }}
+                              disabled={deleteUserMut.isPending}
+                              className="btn-secondary text-[10px] py-1 px-2 gap-1 text-loss"
+                              title="Delete this account"
+                            >
+                              {deleteUserMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                              Delete
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
