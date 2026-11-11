@@ -80,6 +80,20 @@ const authLimiter = rateLimit({
 });
 app.use("/api/auth", authLimiter);
 
+// ── Very strict limit on ACCOUNT CREATION ──────────────
+// A bot created 5 accounts in 8 seconds, so registration is capped per IP.
+const registerLimiter = rateLimit({
+  windowMs: config.rateLimit.registerWindowMs,
+  max: config.rateLimit.registerMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: "REGISTER_RATE_LIMIT", message: "Too many accounts created from this IP. Try again later." },
+  },
+});
+app.use("/api/auth/register", registerLimiter);
+
 // ── Body parsing ────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));

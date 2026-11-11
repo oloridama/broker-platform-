@@ -50,5 +50,8 @@ export const config = {
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000", 10),
     max: parseInt(process.env.RATE_LIMIT_MAX || "600", 10),
+    // Account creation is capped far tighter than general traffic (anti-bot).
+    registerWindowMs: parseInt(process.env.REGISTER_RATE_WINDOW_MS || "3600000", 10),
+    registerMax: parseInt(process.env.REGISTER_RATE_MAX || "3", 10),
   },
 };

@@ -1,8 +1,29 @@
 import { Request, Response } from "express";
 import * as authService from "../services/auth.service";
-import { success } from "../utils/response";
+import { success, AppError } from "../utils/response";
+import { isDisposableEmail } from "../utils/disposableEmails";
+import { verifyTurnstile } from "../utils/turnstile";
 
 export async function register(req: Request, res: Response) {
+  // 1. Honeypot — a hidden field real users never see/fill.
+  if (typeof req.body.website === "string" && req.body.website.trim() !== "") {
+    throw new AppError("Registration failed", 400);
+  }
+
+  // 2. Block throwaway/disposable inboxes used for mass signups.
+  if (isDisposableEmail(String(req.body.email || ""))) {
+    throw new AppError(
+      "Disposable email addresses are not allowed. Please use a permanent email address.",
+      400,
+    );
+  }
+
+  // 3. Bot challenge (only enforced when TURNSTILE_SECRET_KEY is configured).
+  const human = await verifyTurnstile(req.body.turnstileToken, req.ip);
+  if (!human) {
+    throw new AppError("Human verification failed. Please try again.", 400);
+  }
+
   const user = await authService.registerUser(req.body);
   res.status(201).json(success(user));
 }

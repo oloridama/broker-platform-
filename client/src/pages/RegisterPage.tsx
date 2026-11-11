@@ -20,7 +20,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   const { values, errors, handleChange, handleSubmit } = useForm({
-    initialValues: { firstName: "", lastName: "", email: "", password: "", confirmPassword: "" },
+    initialValues: { firstName: "", lastName: "", email: "", password: "", confirmPassword: "", website: "" },
     validate: (v) => {
       const e: Record<string, string> = {};
       if (!v.firstName.trim()) e.firstName = "First name is required";
@@ -42,6 +42,7 @@ export default function RegisterPage() {
           password: v.password,
           firstName: v.firstName,
           lastName: v.lastName,
+          website: v.website, // honeypot — must stay empty
         });
         toast.success("Account created! Please sign in.");
         navigate("/login");
@@ -76,6 +77,19 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="glass p-6 md:p-8 space-y-4" noValidate>
+          {/* Honeypot — off-screen and skipped by keyboard/AT; bots fill it in */}
+          <div aria-hidden="true" className="absolute -left-[9999px] top-auto h-0 w-0 overflow-hidden">
+            <label htmlFor="website">Website</label>
+            <input
+              id="website"
+              name="website"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              value={values.website}
+              onChange={handleChange}
+            />
+          </div>
           {/* Name row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
