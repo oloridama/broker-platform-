@@ -15,6 +15,9 @@ model User {
   lastName      String
   role          String   @default("USER")
   isActive      Boolean  @default(true)
+  /// Admin-controlled switch. When false the user cannot submit withdrawal
+  /// requests (enforced server-side, not merely hidden in the UI).
+  withdrawalsEnabled Boolean @default(true)
   lastLoginAt   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

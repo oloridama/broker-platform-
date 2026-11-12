@@ -14,6 +14,8 @@ export async function getUserProfile(userId: string) {
       lastName: true,
       role: true,
       isActive: true,
+      // Lets the wallet page explain why the Withdraw button is unavailable.
+      withdrawalsEnabled: true,
       lastLoginAt: true,
       createdAt: true,
       kyc: true,

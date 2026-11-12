@@ -58,6 +58,7 @@ interface UserRow {
   lastName: string;
   role: string;
   isActive: boolean;
+  withdrawalsEnabled: boolean;
   wallets: { balance: string; currency: string }[];
   _count: { orders: number; bots: number };
 }
@@ -185,6 +186,17 @@ export default function AdminDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
     },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed to delete user"),
+  });
+
+  // ── Per-user withdrawal switch ───────────────────────
+  const toggleWithdrawalsMut = useMutation({
+    mutationFn: (d: { userId: string; enabled: boolean }) =>
+      patch(`/admin/users/${d.userId}/withdrawals`, { enabled: d.enabled }),
+    onSuccess: (_res, vars) => {
+      toast.success(vars.enabled ? "Withdrawals enabled" : "Withdrawals disabled");
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed to update withdrawals"),
   });
 
   // ── Impersonation (act as a user) ────────────────────
@@ -838,10 +850,22 @@ export default function AdminDashboardPage() {
                       </td>
                       <td className="text-right px-4 py-3">
                         <span className={`text-xs ${u.isActive ? "text-profit" : "text-loss"}`}>{u.isActive ? "Active" : "Inactive"}</span>
+                        {u.withdrawalsEnabled === false && (
+                          <span className="block text-[10px] text-amber-400 mt-0.5">withdrawals off</span>
+                        )}
                       </td>
                       <td className="text-right px-4 py-3">
                         {u.role !== "ADMIN" && (
-                          <div className="flex gap-1.5 justify-end">
+                          <div className="flex gap-1.5 justify-end flex-wrap">
+                            <button
+                              onClick={() => toggleWithdrawalsMut.mutate({ userId: u.id, enabled: !u.withdrawalsEnabled })}
+                              disabled={toggleWithdrawalsMut.isPending}
+                              className={`btn-secondary text-[10px] py-1 px-2 gap-1 ${u.withdrawalsEnabled ? "text-profit" : "text-amber-400"}`}
+                              title={u.withdrawalsEnabled ? "Disable withdrawals for this account" : "Enable withdrawals for this account"}
+                            >
+                              {toggleWithdrawalsMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowUpFromLine className="w-3 h-3" />}
+                              {u.withdrawalsEnabled ? "Wd: On" : "Wd: Off"}
+                            </button>
                             <button
                               onClick={() => impersonateMut.mutate(u.id)}
                               disabled={impersonateMut.isPending}

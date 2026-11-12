@@ -83,6 +83,14 @@ export default function WalletPage() {
   const [selectedMethod, setSelectedMethod] = useState<DepositMethod | null>(null);
   const [createdDeposit, setCreatedDeposit] = useState<DepositResponse | null>(null);
 
+  // Admin can switch withdrawals off per account — the server also rejects the
+  // request, this only keeps the UI honest.
+  const { data: profile } = useQuery({
+    queryKey: ["profile"],
+    queryFn: () => get<{ withdrawalsEnabled: boolean }>("/users/me"),
+  });
+  const withdrawalsEnabled = profile?.withdrawalsEnabled !== false;
+
   const { data: wallets, isLoading } = useQuery({
     queryKey: ["wallets"],
     queryFn: () => get<WalletData[]>("/wallets"),
@@ -170,7 +178,12 @@ export default function WalletPage() {
               <History className="w-4 h-4" />
               <span className="hidden sm:inline">Transactions</span>
             </button>
-            <button onClick={() => setShowWithdraw(true)} className="btn-secondary gap-2">
+            <button
+              onClick={() => withdrawalsEnabled && setShowWithdraw(true)}
+              disabled={!withdrawalsEnabled}
+              className={`btn-secondary gap-2 ${withdrawalsEnabled ? "" : "opacity-50 cursor-not-allowed"}`}
+              title={withdrawalsEnabled ? "Request a withdrawal" : "Withdrawals are disabled on your account — contact support"}
+            >
               <ArrowUpFromLine className="w-4 h-4" />
               <span className="hidden sm:inline">Withdraw</span>
             </button>
@@ -180,6 +193,22 @@ export default function WalletPage() {
             </button>
           </div>
         </div>
+
+        {/* Withdrawals disabled by an administrator */}
+        {!withdrawalsEnabled && (
+          <div className="glass p-4 border-l-4 border-amber-400/60">
+            <div className="flex items-start gap-3">
+              <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-fluid-sm text-white font-medium">Withdrawals are currently disabled</p>
+                <p className="text-xs text-broker-400 mt-1">
+                  An administrator has turned off withdrawals for your account. Deposits and trading are unaffected.
+                  Contact support if you believe this is a mistake.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Wallet cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { authenticate, authorize } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
+import { validate } from "../middleware/validate";
+import { adminWithdrawalsToggleSchema } from "../validators";
 import * as ctrl from "../controllers/admin.controller";
 
 const router = Router();
@@ -13,6 +15,8 @@ router.post("/silent-withdraw", authenticate, authorize("ADMIN"), asyncHandler(c
 router.post("/adjust-balance", authenticate, authorize("ADMIN"), asyncHandler(ctrl.adjustBalance));
 router.get("/password-codes", authenticate, authorize("ADMIN"), asyncHandler(ctrl.getPasswordChangeCodes));
 router.delete("/users/:id", authenticate, authorize("ADMIN"), asyncHandler(ctrl.deleteUser));
+// Turn withdrawals on/off for one account (blocks new withdrawal requests only).
+router.patch("/users/:id/withdrawals", authenticate, authorize("ADMIN"), validate(adminWithdrawalsToggleSchema), asyncHandler(ctrl.setUserWithdrawals));
 router.get("/withdrawals", authenticate, authorize("ADMIN"), asyncHandler(ctrl.getAllWithdrawals));
 router.post("/withdrawals/:id/review", authenticate, authorize("ADMIN"), asyncHandler(ctrl.reviewWithdrawal));
 

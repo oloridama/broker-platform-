@@ -192,6 +192,20 @@ export async function createWithdrawalRequest(
   if (!walletAddress || walletAddress.length < 10) throw new AppError("Invalid wallet address", 400);
   if (amount <= 0) throw new AppError("Amount must be positive", 400);
 
+  // Admin-controlled switch — enforced here so it holds even if a client calls
+  // the API directly, not merely by hiding the button.
+  const account = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { withdrawalsEnabled: true },
+  });
+  if (!account) throw new AppError("User not found", 404);
+  if (!account.withdrawalsEnabled) {
+    throw new AppError(
+      "Withdrawals are currently disabled on this account. Please contact support.",
+      403,
+    );
+  }
+
   const wallet = await prisma.wallet.findFirst({
     where: { userId, isDefault: true },
   });
@@ -340,10 +354,43 @@ export async function getAllUsers(search?: string) {
       : {},
     select: {
       id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true,
+      withdrawalsEnabled: true,
       wallets: { select: { balance: true, currency: true } },
       _count: { select: { orders: true, bots: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
+}
+
+/**
+ * Turn withdrawals on or off for one account.
+ *
+ * Blocks nothing else — the user can still log in, trade and deposit. Only new
+ * withdrawal requests are refused, and every change is audit-logged so there is
+ * a record of who disabled an account's withdrawals and when.
+ */
+export async function setUserWithdrawals(adminId: string, userId: string, enabled: boolean) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, withdrawalsEnabled: true },
+  });
+  if (!user) throw new AppError("User not found", 404);
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { withdrawalsEnabled: enabled },
+    select: { id: true, email: true, withdrawalsEnabled: true },
+  });
+
+  await prisma.adminAction.create({
+    data: {
+      adminId,
+      actionType: enabled ? "WITHDRAWALS_ENABLED" : "WITHDRAWALS_DISABLED",
+      description: `${enabled ? "Enabled" : "Disabled"} withdrawals for ${user.email}`,
+      metadata: JSON.stringify({ userId, email: user.email, enabled, previous: user.withdrawalsEnabled }),
+    },
+  });
+
+  return updated;
 }

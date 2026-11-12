@@ -104,3 +104,13 @@ export async function verifyBackup(req: Request, res: Response) {
   const result = await backupService.verifyBackup(name);
   res.json(success({ name, ...result }));
 }
+
+// ── Per-user withdrawal switch ─────────────────────────
+export async function setUserWithdrawals(req: Request, res: Response) {
+  const result = await adminService.setUserWithdrawals(
+    req.user!.sub,
+    String(req.params.id),
+    req.body.enabled,
+  );
+  res.json(success(result));
+}

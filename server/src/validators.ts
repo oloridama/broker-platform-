@@ -88,6 +88,15 @@ export const requestPasswordChangeSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
 });
 
+// Admin: turn withdrawals on/off for a single account. Strict boolean so a
+// string like "false" cannot be silently coerced into true.
+export const adminWithdrawalsToggleSchema = z.object({
+  enabled: z.boolean({
+    required_error: "enabled is required",
+    invalid_type_error: "enabled must be a boolean",
+  }),
+});
+
 export const confirmPasswordChangeSchema = z.object({
   code: z.string().regex(/^\d{6}$/, "Verification code must be 6 digits"),
   newPassword: z
