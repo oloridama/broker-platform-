@@ -59,6 +59,10 @@ async function main() {
 
   // Start the automated trading-bot scheduler
   startBotScheduler();
+
+  // Start automatic database snapshots. Without this the backup service exists
+  // but never runs — which is exactly how the previous data was lost.
+  startBackupScheduler();
 }
 
 // Graceful shutdown
