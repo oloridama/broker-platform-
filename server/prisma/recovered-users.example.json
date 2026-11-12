@@ -1,0 +1,31 @@
+{
+  "_comment": "TEMPLATE. Copy to recovered-users.json and fill in the real recovered values. recovered-users.json is gitignored because it contains customer PII.",
+  "source": "Where these figures came from (e.g. transcript of a live DB audit)",
+  "capturedAt": "2026-08-30T00:00:00.000Z",
+  "currency": "USD",
+  "users": [
+    {
+      "email": "customer1@example.com",
+      "balance": 12695.85,
+      "orders": 1,
+      "bots": 2,
+      "firstName": "",
+      "lastName": "",
+      "note": "Balance exact as audited"
+    },
+    {
+      "email": "customer2@example.com",
+      "balance": 2913.66,
+      "orders": 0,
+      "bots": 2,
+      "note": "Balance exact as audited"
+    },
+    {
+      "email": "signup-never-funded@example.com",
+      "balance": 0,
+      "orders": 0,
+      "bots": 0,
+      "note": "Real-looking signup, no activity"
+    }
+  ]
+}

@@ -153,3 +153,104 @@ server {
 1. Keep last 3 deployments in separate directories
 2. Database migrations are reversible (Prisma supports `migrate down`)
 3. Use `pm2` for zero-downtime reloads: `pm2 reload broker-server`
+
+---
+
+## Backups & Recovery
+
+**This section exists because production data was once lost outright.** The host
+expired and, because no backup had ever been taken, every user account, balance
+and trade history died with the server. Do not repeat that.
+
+### Automatic snapshots
+
+The server takes a verified snapshot on boot and then every
+`BACKUP_INTERVAL_HOURS` (default 6). Snapshots use SQLite's `VACUUM INTO`, which
+produces a transactionally consistent copy **while the app keeps serving
+traffic** — no downtime, no reads blocked.
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `BACKUP_DIR` | `backups` | Where snapshots are kept on the server |
+| `BACKUP_RETENTION` | `14` | Snapshots retained before the oldest is pruned |
+| `BACKUP_INTERVAL_HOURS` | `6` | Snapshot cadence (`0` disables it) |
+| `BACKUP_REMOTE_CMD` | *(empty)* | Off-box copy command; `{file}` is substituted |
+
+Every snapshot is **verified before it is reported as successful**:
+`PRAGMA integrity_check` must return `ok`, the tables must be readable, and a
+SHA-256 checksum is written next to the file. A snapshot that fails verification
+is deleted and the run is logged as a failure — an unverified file is never
+presented as a backup.
+
+### Off-box copies are mandatory in production
+
+A backup sitting on the same disk as the database is not a backup — it dies with
+the server, exactly as before. Set `BACKUP_REMOTE_CMD` so every snapshot is
+pushed somewhere else:
+
+```bash
+# rclone to any remote (S3, B2, Drive, ...)
+BACKUP_REMOTE_CMD="rclone copy {file} remote:fxa-backups"
+
+# or plain scp to another machine
+BACKUP_REMOTE_CMD="scp {file} backup@other-host:/srv/fxa-backups/"
+```
+
+Failures of the off-box step are logged loudly (`OFF-BOX COPY FAILED`) but do not
+abort the local snapshot.
+
+### Taking and downloading a backup
+
+Admin Dashboard → **Database Backups** → *Back Up Now*. The panel shows every
+retained snapshot with its age, size, integrity status and user count, and offers
+**Download** (streams a gzipped copy to your machine) and **Verify** (re-checks
+the checksum).
+
+The panel warns in red when **no backup exists** and in amber when the newest is
+older than 24 hours. Treat both as incidents.
+
+Equivalent API: `GET /api/admin/backups`, `POST /api/admin/backups`,
+`GET /api/admin/backups/:name/download`, `GET /api/admin/backups/:name/verify`
+(all admin-only).
+
+### Restoring
+
+```bash
+# 1. Stop the app so nothing writes mid-restore
+pm2 stop broker
+
+# 2. Verify the archive you are about to restore
+sha256sum fxa-20261112T191500Z.db       # compare against the .sha256 sidecar
+
+# 3. Keep the current (possibly broken) DB — never destroy evidence
+mv dev.db dev.db.broken-$(date +%s)
+
+# 4. Restore, and let Prisma confirm the schema matches the build
+cp /path/to/fxa-20261112T191500Z.db dev.db
+npx prisma migrate deploy
+
+# 5. Restart
+pm2 start ecosystem.config.js
+curl -s http://127.0.0.1:4000/api/health
+```
+
+Downloaded backups arrive gzipped: `gunzip fxa-*.db.gz` first.
+
+### Postgres
+
+The built-in snapshots are SQLite-only. For Postgres use `pg_dump`/`pg_restore`
+on the same schedule and push the dump off-box:
+
+```bash
+pg_dump "$DATABASE_URL" -Fc -f fxa-$(date -u +%Y%m%dT%H%M%SZ).dump
+```
+
+### Rules that prevent a repeat of the data loss
+
+1. **Never let hosting lapse silently** — put the renewal date in a calendar with
+   a 30-day warning.
+2. **Always have an off-box copy** — verify `BACKUP_REMOTE_CMD` is configured by
+   checking the newest snapshot exists on the remote.
+3. **Test a restore** — an untested backup is an assumption, not a backup.
+4. **Watch the amber warning** — if the newest snapshot is >24h old, snapshots
+   have stopped working.

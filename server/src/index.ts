@@ -4,6 +4,7 @@ import prisma from "./db";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { startBotScheduler } from "./botScheduler";
+import { startBackupScheduler } from "./services/backup.service";
 import { fetchAllMarketPrices } from "./services/market.service";
 
 async function main() {

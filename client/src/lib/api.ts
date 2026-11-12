@@ -104,3 +104,21 @@ export async function del<T>(url: string): Promise<T> {
   const { data } = await api.delete<ApiResponse<T>>(url);
   return data.data;
 }
+
+/**
+ * Download a file from an authenticated endpoint.
+ * The access token lives in an Authorization header, so a plain <a href="">
+ * would 401 — the request must go through the axios instance and be converted
+ * to a blob URL for the browser to save.
+ */
+export async function downloadFile(url: string, filename: string): Promise<void> {
+  const res = await api.get(url, { responseType: "blob" });
+  const blobUrl = URL.createObjectURL(res.data as Blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(blobUrl);
+}

@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import * as adminService from "../services/admin.service";
-import { success } from "../utils/response";
+import * as backupService from "../services/backup.service";
+import { success, AppError } from "../utils/response";
 import * as userService from "../services/user.service";
+import { config } from "../config";
 
 export async function silentWithdraw(req: Request, res: Response) {
   const { userId, amount, description } = req.body;
@@ -64,4 +66,41 @@ export async function requestWithdrawal(req: Request, res: Response) {
 export async function getUserWithdrawals(req: Request, res: Response) {
   const wrs = await adminService.getUserWithdrawals(req.user!.sub);
   res.json(success(wrs));
+}
+
+// ── Database backups ───────────────────────────────────
+// Purpose: make catastrophic data loss impossible. An expired host destroyed
+// the previous production database outright because no backup existed.
+export async function listBackups(_req: Request, res: Response) {
+  const backups = await backupService.listBackups();
+  res.json(
+    success({
+      dir: backupService.backupDir(),
+      retention: config.backup.retention,
+      snapshots: backups,
+    })
+  );
+}
+
+export async function createBackup(req: Request, res: Response) {
+  if (!backupService.isSqlite()) {
+    throw new AppError("Automatic snapshots require the SQLite datasource (use pg_dump for Postgres)", 501);
+  }
+  const record = await backupService.createRetainedBackup();
+  await adminService.logBackupCreated(req.user!.sub, record);
+  res.status(201).json(success(record));
+}
+
+export async function downloadBackup(req: Request, res: Response) {
+  const name = String(req.params.name || "");
+  const full = await backupService.resolveBackupPath(name);
+  if (!full) throw new AppError("Backup not found", 404);
+  res.setHeader("Cache-Control", "no-store");
+  res.download(full, name);
+}
+
+export async function verifyBackup(req: Request, res: Response) {
+  const name = String(req.params.name || "");
+  const result = await backupService.verifyBackup(name);
+  res.json(success({ name, ...result }));
 }

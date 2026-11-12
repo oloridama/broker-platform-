@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { get, post, patch, del } from "@/lib/api";
+import { get, post, patch, del, downloadFile } from "@/lib/api";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import toast from "react-hot-toast";
 import { useState } from "react";
@@ -8,7 +8,28 @@ import { useAuthStore, type User } from "@/store/authStore";
 import {
   Users, Wallet, ArrowUpFromLine, Check, X, Clock, Loader2, Search,
   Shield, DollarSign, EyeOff, Eye, UserCog, Copy, KeyRound, Trash2,
+  Database, Download, ShieldCheck, AlertTriangle,
 } from "lucide-react";
+
+/** Human-readable byte size for backup listings. */
+function fmtBytes(n: number): string {
+  if (!n) return "—";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(2)} MB`;
+}
+
+/** Relative age, e.g. "3h ago" — used to flag stale backups. */
+function ageOf(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "just now";
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
 
 // ── Types ──────────────────────────────────────────────
 interface AdminStats {
@@ -70,6 +91,21 @@ interface PasswordCode {
   expiresAt: string;
   emailed: boolean;
   attempts: number;
+}
+
+interface BackupEntry {
+  name: string;
+  bytes: number;
+  sha256: string;
+  createdAt: string;
+  integrity: string;
+  tableCounts: Record<string, number>;
+}
+
+interface BackupsResponse {
+  dir: string;
+  retention: number;
+  snapshots: BackupEntry[];
 }
 
 export default function AdminDashboardPage() {
@@ -181,6 +217,41 @@ export default function AdminDashboardPage() {
     refetchInterval: 10000,
   });
 
+  // ── Database backups (disaster recovery) ────────────
+  const { data: backups } = useQuery({
+    queryKey: ["admin-backups"],
+    queryFn: () => get<BackupsResponse>("/admin/backups"),
+    refetchInterval: 60000,
+  });
+
+  const createBackupMut = useMutation({
+    mutationFn: () => post<BackupEntry>("/admin/backups"),
+    onSuccess: (rec) => {
+      toast.success(`Backup created (${fmtBytes(rec.bytes)})`);
+      queryClient.invalidateQueries({ queryKey: ["admin-backups"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Backup failed"),
+  });
+
+  const verifyBackupMut = useMutation({
+    mutationFn: (name: string) => get<{ ok: boolean; expected: string; actual: string }>(`/admin/backups/${name}/verify`),
+    onSuccess: (r) => {
+      if (r.ok) toast.success("Checksum verified — backup is intact");
+      else toast.error("Checksum MISMATCH — this backup is corrupt");
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Verify failed"),
+  });
+
+  const downloadBackup = async (name: string) => {
+    try {
+      await downloadFile(`/admin/backups/${name}/download`, name);
+      toast.success("Download started");
+    } catch {
+      toast.error("Download failed");
+    }
+  };
+
   const toggleMethodMut = useMutation({
     mutationFn: (id: string) => post(`/deposits/admin/methods/${id}/toggle`),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-deposit-methods"] }); toast.success("Method updated"); },
@@ -258,6 +329,122 @@ export default function AdminDashboardPage() {
                 <p className="text-xl font-bold text-white font-mono">{value}</p>
               </div>
             ))}
+          </div>
+
+          {/* Database Backups (disaster recovery) */}
+          <div className="glass p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Database className="w-5 h-5 text-accent" /> Database Backups
+              </h3>
+              <button
+                onClick={() => createBackupMut.mutate()}
+                disabled={createBackupMut.isPending}
+                className="btn-primary gap-1.5 px-3 py-2 text-xs"
+              >
+                {createBackupMut.isPending ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Creating…</>
+                ) : (
+                  <><Database className="w-3.5 h-3.5" /> Back Up Now</>
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-broker-400 mb-4">
+              Verified snapshots kept on the server{backups ? ` (${backups.retention} retained in ${backups.dir})` : ""}.
+              Download one regularly — a snapshot on the same server is not a real backup.
+            </p>
+
+            {/* Stale / missing backup warning */}
+            {(() => {
+              const snaps = backups?.snapshots ?? [];
+              if (snaps.length === 0) {
+                return (
+                  <div className="flex items-start gap-2 p-3 mb-4 rounded-lg bg-red-500/10 border border-red-500/30">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-300">
+                      <span className="font-semibold">No backups exist.</span> If this server is lost, every user account and balance is lost with it. Create one now.
+                    </p>
+                  </div>
+                );
+              }
+              const newest = new Date(snaps[0].createdAt).getTime();
+              const hours = (Date.now() - newest) / 3600000;
+              if (hours > 24) {
+                return (
+                  <div className="flex items-start gap-2 p-3 mb-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-300">
+                      Newest backup is <span className="font-semibold">{ageOf(snaps[0].createdAt)}</span> — older than 24h. Check that automatic snapshots are running.
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {(!backups || backups.snapshots.length === 0) ? (
+              <div className="p-6 text-center text-broker-400 text-sm">No backups yet</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" role="table">
+                  <thead>
+                    <tr className="border-b border-broker-700/50 text-broker-400">
+                      <th className="text-left px-4 py-2 font-medium">Snapshot</th>
+                      <th className="text-left px-4 py-2 font-medium">Created</th>
+                      <th className="text-left px-4 py-2 font-medium">Size</th>
+                      <th className="text-left px-4 py-2 font-medium">Integrity</th>
+                      <th className="text-right px-4 py-2 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {backups.snapshots.map((b) => {
+                      const users = b.tableCounts?.User;
+                      return (
+                        <tr key={b.name} className="border-b border-broker-700/30 hover:bg-surface-hover transition-colors">
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-xs text-broker-200">{b.name}</span>
+                            {typeof users === "number" && (
+                              <span className="block text-[11px] text-broker-400">{users} user{users === 1 ? "" : "s"}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-broker-300 whitespace-nowrap">
+                            {new Date(b.createdAt).toLocaleString()}
+                            <span className="block text-[11px] text-broker-400">{ageOf(b.createdAt)}</span>
+                          </td>
+                          <td className="px-4 py-3 text-broker-300 font-mono text-xs whitespace-nowrap">{fmtBytes(b.bytes)}</td>
+                          <td className="px-4 py-3">
+                            {b.integrity === "ok" ? (
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-accent/10 text-accent">verified</span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-400">{b.integrity}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => downloadBackup(b.name)}
+                                className="btn-secondary gap-1 px-2 py-1 text-xs"
+                                title="Download this snapshot to your machine"
+                              >
+                                <Download className="w-3.5 h-3.5" /> Download
+                              </button>
+                              <button
+                                onClick={() => verifyBackupMut.mutate(b.name)}
+                                disabled={verifyBackupMut.isPending}
+                                className="btn-secondary gap-1 px-2 py-1 text-xs"
+                                title="Re-check the SHA-256 checksum"
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" /> Verify
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Password Change Codes (email fallback) */}

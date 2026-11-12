@@ -8,3 +8,13 @@ coverage/
 *.db
 *.tsbuildinfo
 tmp_*.png
+
+# Database backups contain password hashes and user PII — never commit them.
+backups/
+*.db.gz
+*.db.sha256
+
+# Recovery import data is real customer PII, and the credentials file holds
+# live temporary passwords. Both stay off the repo.
+server/prisma/recovered-users.json
+server/prisma/recovered-credentials.csv

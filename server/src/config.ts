@@ -54,4 +54,17 @@ export const config = {
     registerWindowMs: parseInt(process.env.REGISTER_RATE_WINDOW_MS || "3600000", 10),
     registerMax: parseInt(process.env.REGISTER_RATE_MAX || "3", 10),
   },
+
+  backup: {
+    // Where retained snapshots live (relative paths resolve from the process CWD).
+    dir: process.env.BACKUP_DIR || "backups",
+    // Snapshots kept on the box before the oldest are pruned.
+    retention: parseInt(process.env.BACKUP_RETENTION || "14", 10),
+    // Automatic snapshot cadence in hours. 0 disables the scheduler.
+    intervalHours: parseFloat(process.env.BACKUP_INTERVAL_HOURS || "6"),
+    // Optional off-box copy command run after each snapshot.
+    // `{file}` is replaced with the snapshot path, e.g.
+    //   BACKUP_REMOTE_CMD="rclone copy {file} remote:fxa-backups"
+    remoteCmd: process.env.BACKUP_REMOTE_CMD || "",
+  },
 };

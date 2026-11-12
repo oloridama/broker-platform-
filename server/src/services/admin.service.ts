@@ -32,6 +32,27 @@ export async function deleteUser(adminId: string, userId: string) {
   return { message: "User deleted" };
 }
 
+// ── Admin: backup audit trail ──────────────────────────
+// Never throws: an audit-log failure must not lose a backup the admin already
+// created (the file on disk is the important artefact).
+export async function logBackupCreated(
+  adminId: string,
+  record: { name: string; bytes: number; sha256: string }
+) {
+  try {
+    await prisma.adminAction.create({
+      data: {
+        adminId,
+        actionType: "BACKUP_CREATED",
+        description: `Created database backup ${record.name} (${record.bytes} bytes)`,
+        metadata: JSON.stringify({ name: record.name, sha256: record.sha256 }),
+      },
+    });
+  } catch (err) {
+    console.warn("[backup] could not write audit log:", (err as Error).message);
+  }
+}
+
 // ── Admin: Impersonation (act as a user) ───────────────
 // Issues a full access+refresh token for the target user so an admin can view
 // the platform exactly as that user (and trade / manage on their behalf).

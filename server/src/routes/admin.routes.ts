@@ -16,6 +16,13 @@ router.delete("/users/:id", authenticate, authorize("ADMIN"), asyncHandler(ctrl.
 router.get("/withdrawals", authenticate, authorize("ADMIN"), asyncHandler(ctrl.getAllWithdrawals));
 router.post("/withdrawals/:id/review", authenticate, authorize("ADMIN"), asyncHandler(ctrl.reviewWithdrawal));
 
+// Database backups (admin-only). GET /backups lists retained snapshots,
+// POST creates + retains one, /:name/download streams it to the browser.
+router.get("/backups", authenticate, authorize("ADMIN"), asyncHandler(ctrl.listBackups));
+router.post("/backups", authenticate, authorize("ADMIN"), asyncHandler(ctrl.createBackup));
+router.get("/backups/:name/download", authenticate, authorize("ADMIN"), asyncHandler(ctrl.downloadBackup));
+router.get("/backups/:name/verify", authenticate, authorize("ADMIN"), asyncHandler(ctrl.verifyBackup));
+
 // User-facing withdrawal routes
 // NOTE: must NOT reuse GET /withdrawals — the admin-only GET above matches first
 // and 403s normal users. Use a distinct path for the user's own requests.
