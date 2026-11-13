@@ -13,7 +13,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:restore-users": "tsx prisma/restore-recovered-users.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:set-password": "tsx prisma/set-password.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
