@@ -63,9 +63,12 @@ export async function registerUser(data: {
 
 // ── Login (with account lockout) ───────────────────────
 // Per-account failed attempt tracking → temporary lockout after 5 failures.
-const failedAttempts = new Map<string, { count: number; lockUntil: number }>();
+const failedAttempts = new Map<string, { count: number; lockUntil: number; lastFailure: number }>();
 const MAX_FAILED = 5;
 const LOCK_MS = 15 * 60 * 1000; // 15 minutes
+// Scattered failures are forgotten after this long, so a few typos spread over
+// days can never silently add up to a lockout.
+const DECAY_MS = 60 * 60 * 1000; // 1 hour
 
 /** Reset failed-attempt tracking (used by admin unlock + tests). */
 export function resetFailedAttempts(email?: string) {
@@ -78,12 +81,22 @@ export function resetFailedAttempts(email?: string) {
 
 export async function loginUser(email: string, password: string) {
   const normalized = email.toLowerCase().trim();
-  const attempt = failedAttempts.get(normalized);
+  const now = Date.now();
+  let attempt = failedAttempts.get(normalized);
 
   // Account temporarily locked?
-  if (attempt && attempt.lockUntil > Date.now()) {
-    const minsLeft = Math.ceil((attempt.lockUntil - Date.now()) / 60000);
+  if (attempt && attempt.lockUntil > now) {
+    const minsLeft = Math.ceil((attempt.lockUntil - now) / 60000);
     throw new AppError(`Account temporarily locked. Try again in ${minsLeft} min.`, 423);
+  }
+
+  // Lock has expired, or the failures are stale → forget them so the user gets
+  // a full set of attempts again. This was the bug that made lockouts
+  // permanent: `count` was never cleared, so after the first lockout every
+  // single wrong password re-locked the account immediately, forever.
+  if (attempt && (attempt.lockUntil !== 0 || now - attempt.lastFailure > DECAY_MS)) {
+    failedAttempts.delete(normalized);
+    attempt = undefined;
   }
 
   const user = await prisma.user.findUnique({ where: { email: normalized } });
@@ -99,12 +112,16 @@ export async function loginUser(email: string, password: string) {
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
     // Increment failed counter
-    const current = failedAttempts.get(normalized)?.count || 0;
+    const current = attempt?.count ?? 0;
     const newCount = current + 1;
     if (newCount >= MAX_FAILED) {
-      failedAttempts.set(normalized, { count: newCount, lockUntil: Date.now() + LOCK_MS });
+      failedAttempts.set(normalized, {
+        count: newCount,
+        lockUntil: now + LOCK_MS,
+        lastFailure: now,
+      });
     } else {
-      failedAttempts.set(normalized, { count: newCount, lockUntil: 0 });
+      failedAttempts.set(normalized, { count: newCount, lockUntil: 0, lastFailure: now });
     }
     throw new AppError(
       newCount >= MAX_FAILED
